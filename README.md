@@ -2,7 +2,7 @@
 
 ## 📋 Sobre o Projeto
 
-O **POBChecker** é um sistema desenvolvido para controle de presença do POB (People On Board - Pessoas a Bordo) em plataformas de petróleo offshore da Petrobras. O sistema utiliza câmera para leitura de QR Codes contendo informações de CPF e nome dos funcionários, proporcionando um controle eficiente e automatizado da presença.
+O **POBChecker** é um sistema desenvolvido para controle de presença do POB (People On Board - Pessoas a Bordo) em plataformas de petróleo offshore. O sistema utiliza câmera para leitura de QR Codes contendo informações de CPF e nome dos funcionários, proporcionando um controle eficiente e automatizado da presença.
 
 ### 🎯 Objetivo Principal
 
@@ -186,7 +186,7 @@ python helper/helper_clear_data.py
 
 ## 📄 Licença
 
-Este projeto foi desenvolvido para uso interno da Petrobras no controle de POB em plataformas offshore.
+Este projeto foi desenvolvido para uso no controle de POB em plataformas offshore.
 
 ## 🆘 Suporte
 
@@ -198,7 +198,7 @@ Para suporte técnico ou questões sobre o sistema:
 ---
 
 **POBChecker v2.0** - Sistema de Controle POB  
-Desenvolvido para Petrobras - Segurança Offshore
+Desenvolvido por Ygor Pitombeira - Segurança Offshore
 
 ### Sistema
 - **Linux**: `pulseaudio-utils`, `alsa-utils`, `python3-tk`

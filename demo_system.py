@@ -86,7 +86,6 @@ def populate_test_data():
 def main():
     """Função principal"""
     print("POBCHECKER - SISTEMA DE CONTROLE POB v2.0")
-    print("Desenvolvido para Petrobras - Plataformas Offshore")
     
     while True:
         show_menu()
