@@ -1,0 +1,16 @@
+customtkinter
+opencv-python-headless
+pyzbar
+Pillow
+Faker
+qrcode
+
+# Dependências específicas do sistema para reprodução de som
+# Linux: Para usar paplay (PulseAudio) - geralmente já instalado
+# sudo apt-get install pulseaudio-utils alsa-utils
+
+# Windows: winsound (já incluído no Python padrão)
+
+# macOS: afplay (já incluído no sistema)
+
+# O módulo audio_manager.py gerencia automaticamente a compatibilidade entre sistemas
