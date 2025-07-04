@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# Arquivo: attendance_checker.py - Tela de controle de presença
+# Arquivo: pobchecker_terminal.py - Script principal do POBChecker
+# Sistema de Controle de Presença - Terminal Operacional
 
 import customtkinter as ctk
 import time
@@ -655,3 +656,8 @@ if __name__ == "__main__":
         # Execução normal
         app = AttendanceChecker()
         app.mainloop()
+
+if __name__ == "__main__":
+    # Execução direta do script principal
+    app = AttendanceChecker()
+    app.mainloop()

@@ -52,8 +52,8 @@ source venv/bin/activate
 # Instale dependências Python
 pip install -r requirements.txt
 
-# Execute o sistema
-python main_launcher.py
+# Execute o sistema principal
+python pobchecker_terminal.py
 ```
 
 ### Instalação no Linux (Ubuntu/Debian)
@@ -70,7 +70,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Execute
-python main_launcher.py
+python pobchecker_terminal.py
 ```
 
 ### Instalação no Windows (Desenvolvimento)
@@ -79,24 +79,25 @@ python main_launcher.py
 # Instale as dependências Python
 pip install -r requirements.txt
 
-# Execute o aplicativo
-python main_launcher.py
+# Execute o aplicativo principal
+python pobchecker_terminal.py
 ```
 
 ## 📱 Funcionalidades
 
 ### Módulos do Sistema
 
-1. **Controle de Presença** (`attendance_checker.py`)
+1. **Controle de Presença** (`pobchecker_terminal.py`)
+   - Script principal do sistema
    - Leitura de QR Codes via câmera
    - Modo Check Alert - Verificação de presença
    - Modo Check In/Out - Adição/remoção do POB
    - Pesquisa manual por nome ou CPF
    
-2. **Gerenciamento de Pessoal** (`personnel_manager.py`)
-   - Cadastro de funcionários
-   - Geração de QR Codes personalizados
-   - Organização por grupos
+2. **Helpers** (pasta `helper/`)
+   - `helper_generate_qrcodes.py` - Geração de QR Codes personalizados
+   - `helper_clear_data.py` - Limpeza de dados
+   - `helper_pob_generate.py` - Geração de dados de teste
    
 3. **Banco de Dados** (`database.py`)
    - SQLite para persistência local
@@ -113,13 +114,13 @@ Os QR Codes contêm informações no formato: `CPF|NOME`
 
 ### 1. Inicialização
 ```bash
-python main_launcher.py
+python pobchecker_terminal.py
 ```
 
-### 2. Gerenciamento de Pessoal
-- Cadastre funcionários com CPF e nome
-- Gere QR Codes automaticamente
-- Organize por grupos (1 ou 2)
+### 2. Geração de QR Codes
+- Execute `python helper/helper_generate_qrcodes.py` para gerar QR Codes
+- Os códigos são salvos na pasta `qrcodes_cpf/`
+- Formato: CPF|Nome para melhor identificação
 
 ### 3. Controle de Presença
 - **Modo Check Alert**: Verificação de presença para alarmes
@@ -163,13 +164,15 @@ chmod +x setup_pi.sh
 
 ### Estrutura do Código
 ```
-main_launcher.py        # Interface principal
-attendance_checker.py   # Módulo de controle de presença  
-personnel_manager.py    # Módulo de gerenciamento
+pobchecker_terminal.py  # Script principal do sistema
 database.py            # Operações de banco de dados
 camera_manager.py      # Gerenciamento de câmera
 audio_manager.py       # Sistema de áudio multiplataforma
-generate_qrcodes.py    # Geração de QR Codes
+demo_system.py         # Sistema de demonstração e menu
+helper/                # Pasta de utilitários
+  helper_generate_qrcodes.py  # Geração de QR Codes
+  helper_clear_data.py        # Limpeza de dados
+  helper_pob_generate.py      # Geração de dados de teste
 ```
 
 ### Testes

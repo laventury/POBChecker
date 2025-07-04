@@ -1,4 +1,4 @@
-# Arquivo: generate_qrcodes.py
+# Arquivo: helper_generate_qrcodes.py - Helper para geração de QR Codes
 
 import sqlite3
 import qrcode
