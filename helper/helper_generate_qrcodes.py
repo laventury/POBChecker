@@ -4,11 +4,17 @@ import sqlite3
 import qrcode
 import os
 import re
+import sys
+
+# Adiciona o diretório pai ao path para importar config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import QR_EVENT_CODE
 
 # --- Configurações ---
-DATABASE_FILE = "pobchecker.sqlite3"
-OUTPUT_FOLDER = "qrcodes_cpf"
+# Obtem o diretório raiz do projeto (diretório pai do helper)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATABASE_FILE = os.path.join(ROOT_DIR, "pobchecker.sqlite3")
+OUTPUT_FOLDER = os.path.join(ROOT_DIR, "qrcodes_cpf")
 
 def sanitize_filename(name):
     """
@@ -43,7 +49,7 @@ def create_qrcodes():
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT Nome, CPF FROM POB")
+        cursor.execute("SELECT Name, CPF FROM POB")
         people = cursor.fetchall()
     except sqlite3.Error as e:
         print(f"Ocorreu um erro ao ler o banco de dados: {e}")

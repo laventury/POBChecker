@@ -27,7 +27,7 @@ def clear_check_records():
         cursor.execute("SELECT COUNT(*) FROM POB")
         pob_count_before = cursor.fetchone()[0]
         
-        cursor.execute("SELECT COUNT(*) FROM CHECKS")
+        cursor.execute("SELECT COUNT(*) FROM CHECK_EVENT")
         checks_count_before = cursor.fetchone()[0]
         
         print(f"📊 Antes da limpeza:")
@@ -54,12 +54,13 @@ def clear_check_records():
         print("✅ Registros de POB limpos")
         
         # Limpa registros de check
-        cursor.execute("DELETE FROM CHECKS")
+        cursor.execute("DELETE FROM CHECK_EVENT")
+        cursor.execute("DELETE FROM CHECK_IN_OUT")
         print("✅ Registros de check limpos")
         
         # Reset dos IDs auto-incremento apenas para essas tabelas
-        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('POB', 'CHECKS')")
-        print("✅ IDs de POB e CHECKS resetados")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('POB', 'CHECK_EVENT', 'CHECK_IN_OUT')")
+        print("✅ IDs de POB, CHECK_EVENT e CHECK_IN_OUT resetados")
         
         db.conn.commit()
         

@@ -36,46 +36,49 @@ def show_stats(db):
         cursor.execute("SELECT COUNT(*) FROM POB")
         people_count = cursor.fetchone()[0]
         
-        # Conta pessoas no POB atual (assumindo que POB é a tabela atual)
-        pob_count = people_count  # Simplificado
+        # Conta pessoas no POB atual (onshore = 0)
+        cursor.execute("SELECT COUNT(*) FROM POB WHERE Onshore = 0")
+        pob_count = cursor.fetchone()[0]
         
         # Conta eventos
         cursor.execute("SELECT COUNT(*) FROM EVENTS")
         events_count = cursor.fetchone()[0]
         
-        # Conta registros de check
-        cursor.execute("SELECT COUNT(*) FROM CHECKS")
+        # Conta registros de check_event
+        cursor.execute("SELECT COUNT(*) FROM CHECK_EVENT")
         checks_count = cursor.fetchone()[0]
         
+        # Conta registros CHECK_IN_OUT
+        try:
+            cursor.execute("SELECT COUNT(*) FROM CHECK_IN_OUT")
+            checkin_out_count = cursor.fetchone()[0]
+        except:
+            checkin_out_count = 0
+        
         print(f"\n📊 ESTATÍSTICAS DO BANCO DE DADOS")
-        print(f"   Pessoas cadastradas: {people_count}")
-        print(f"   Pessoas no POB atual: {pob_count}")
+        print(f"   Total de pessoas cadastradas: {people_count}")
+        print(f"   Pessoas no POB atualmente: {pob_count}")
         print(f"   Total de eventos: {events_count}")
         print(f"   Total de registros de check: {checks_count}")
+        print(f"   Total de registros check in/out: {checkin_out_count}")
         
     except Exception as e:
         print(f"❌ Erro ao obter estatísticas: {e}")
 
 def clear_all_data(db):
     """Limpa todos os dados do banco"""
-    print("\n⚠️  ATENÇÃO: Esta operação irá remover TODOS os dados!")
-    confirm = input("Digite 'CONFIRMAR' para prosseguir: ")
-    
-    if confirm != "CONFIRMAR":
-        print("❌ Operação cancelada.")
-        return
-    
+    print("🗑️  Limpando TODOS os dados...")
     try:
         cursor = db.cursor
         
         # Limpa todas as tabelas
-        cursor.execute("DELETE FROM POB")
+        cursor.execute("DELETE FROM CHECK_EVENT")
+        cursor.execute("DELETE FROM CHECK_IN_OUT")
         cursor.execute("DELETE FROM EVENTS")
-        cursor.execute("DELETE FROM CHECKS")
-        # Nota: Não há tabela PERSONNEL, só POB
+        cursor.execute("DELETE FROM POB")
         
-        # Reset dos IDs auto-incremento
-        cursor.execute("DELETE FROM sqlite_sequence")
+        # Reseta os contadores de ID automático
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('POB', 'EVENTS', 'CHECK_EVENT', 'CHECK_IN_OUT')")
         
         db.conn.commit()
         print("✅ Todos os dados foram removidos com sucesso!")
@@ -84,35 +87,41 @@ def clear_all_data(db):
         print(f"❌ Erro ao limpar dados: {e}")
 
 def clear_pob_only(db):
-    """Limpa apenas os registros de presença"""
-    print("\n⚠️  Esta operação irá remover apenas os registros de presença (POB).")
-    confirm = input("Confirmar? (s/N): ")
-    
-    if confirm.lower() != 's':
-        print("❌ Operação cancelada.")
-        return
-    
+    """Limpa apenas registros de presença (POB)"""
+    print("🗑️  Limpando registros de presença...")
     try:
         cursor = db.cursor
+        
+        # Primeiro remove os registros relacionados
+        cursor.execute("DELETE FROM CHECK_EVENT")
+        cursor.execute("DELETE FROM CHECK_IN_OUT")
+        
+        # Depois remove o POB
         cursor.execute("DELETE FROM POB")
+        
+        # Reseta os contadores
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('POB', 'CHECK_EVENT', 'CHECK_IN_OUT')")
+        print("✅ IDs de POB, CHECK_EVENT e CHECK_IN_OUT resetados")
+        
         db.conn.commit()
         print("✅ Registros de presença removidos com sucesso!")
         
     except Exception as e:
-        print(f"❌ Erro ao limpar POB: {e}")
+        print(f"❌ Erro ao limpar registros de presença: {e}")
 
 def clear_events_only(db):
-    """Limpa apenas os eventos"""
-    print("\n⚠️  Esta operação irá remover apenas os eventos.")
-    confirm = input("Confirmar? (s/N): ")
-    
-    if confirm.lower() != 's':
-        print("❌ Operação cancelada.")
-        return
-    
+    """Limpa apenas eventos"""
+    print("🗑️  Limpando eventos...")
     try:
         cursor = db.cursor
+        
+        # Remove check_events primeiro (integridade referencial)
+        cursor.execute("DELETE FROM CHECK_EVENT")
         cursor.execute("DELETE FROM EVENTS")
+        
+        # Reseta contadores
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('EVENTS', 'CHECK_EVENT')")
+        
         db.conn.commit()
         print("✅ Eventos removidos com sucesso!")
         
@@ -121,31 +130,61 @@ def clear_events_only(db):
 
 def main():
     """Função principal"""
+    print("🚀 POBCHECKER - LIMPEZA DE DADOS v2.0")
+    
+    # Conecta ao banco
     try:
         db = Database()
+        print("✅ Conectado ao banco de dados")
+    except Exception as e:
+        print(f"❌ Erro ao conectar ao banco: {e}")
+        return
+    
+    while True:
+        show_menu()
         
-        while True:
-            show_menu()
-            show_stats(db)
-            
-            choice = input("\nEscolha uma opção: ")
+        try:
+            choice = input("\nEscolha uma opção: ").strip()
             
             if choice == "1":
-                clear_all_data(db)
+                confirm = input("⚠️  ATENÇÃO: Isso irá remover TODOS os dados. Confirma? (digite 'SIM'): ")
+                if confirm.upper() == "SIM":
+                    clear_all_data(db)
+                else:
+                    print("❌ Operação cancelada")
+                    
             elif choice == "2":
-                clear_pob_only(db)
+                confirm = input("⚠️  Confirma limpar registros de presença? (digite 'SIM'): ")
+                if confirm.upper() == "SIM":
+                    clear_pob_only(db)
+                else:
+                    print("❌ Operação cancelada")
+                    
             elif choice == "3":
-                clear_events_only(db)
+                confirm = input("⚠️  Confirma limpar eventos? (digite 'SIM'): ")
+                if confirm.upper() == "SIM":
+                    clear_events_only(db)
+                else:
+                    print("❌ Operação cancelada")
+                    
             elif choice == "4":
                 show_stats(db)
+                
             elif choice == "5":
                 print("👋 Saindo...")
                 break
-            else:
-                print("❌ Opção inválida!")
                 
-    except Exception as e:
-        print(f"❌ Erro ao conectar ao banco de dados: {e}")
+            else:
+                print("❌ Opção inválida")
+                
+        except KeyboardInterrupt:
+            print("\n👋 Saindo...")
+            break
+        except Exception as e:
+            print(f"❌ Erro: {e}")
+    
+    # Fecha conexão
+    db.conn.close()
 
 if __name__ == "__main__":
     main()

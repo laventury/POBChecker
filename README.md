@@ -101,7 +101,7 @@ python pobchecker_terminal.py
    
 3. **Banco de Dados** (`database.py`)
    - SQLite para persistência local
-   - Tabelas: POB, EVENTS, CHECKS
+   - Tabelas: POB, EVENTS, CHECK_EVENT, CHECK_IN_OUT
    - Backup automático de dados
 
 ### Formato dos QR Codes
@@ -201,7 +201,7 @@ Para suporte técnico ou questões sobre o sistema:
 ---
 
 **POBChecker v2.0** - Sistema de Controle POB  
-Desenvolvido por Ygor Pitombeira - Segurança Offshore
+Desenvolvido por Ygor Pitombeira
 
 ### Sistema
 - **Linux**: `pulseaudio-utils`, `alsa-utils`, `python3-tk`
@@ -210,7 +210,7 @@ Desenvolvido por Ygor Pitombeira - Segurança Offshore
 
 ## Como Usar
 
-1. Execute `python main.py`
+1. Execute `python pobchecker_terminal.py`
 2. A câmera será ativada automaticamente
 3. Aponte QR codes para a câmera para registrar presenças
 4. Use a pesquisa manual para buscar por nome ou CPF

@@ -34,11 +34,12 @@ def auto_clear_data():
         print("✅ Eventos limpos")
         
         # Limpa registros de check
-        cursor.execute("DELETE FROM CHECKS")
+        cursor.execute("DELETE FROM CHECK_EVENT")
+        cursor.execute("DELETE FROM CHECK_IN_OUT")
         print("✅ Registros de check limpos")
         
         # Reset dos IDs auto-incremento
-        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('POB', 'EVENTS', 'CHECKS')")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('POB', 'EVENTS', 'CHECK_EVENT', 'CHECK_IN_OUT')")
         print("✅ IDs resetados")
         
         db.conn.commit()
