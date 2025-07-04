@@ -265,14 +265,25 @@ class AttendanceChecker:
         cpf_db, nome_db, grupo = person_data
         nome_display = nome_qr if nome_qr else nome_db
         
-        # Tenta registrar presença
-        if self.db.record_check_event(cpf, nome_display, self.active_event_id):
-            self.update_status_bar(f"Presença registrada: {nome_display}", "green")
-            play_success_sound()
-            self.update_person_list()
+        # Verifica se a pessoa já está checada no evento
+        if self.db.is_person_checked_in_event(cpf, self.active_event_id):
+            # Pessoa já checada - fazer estorno
+            if self.db.remove_check_event(cpf, self.active_event_id):
+                self.update_status_bar(f"Estorno realizado: {nome_display} removido da lista de presença", "orange")
+                play_beep_sound()
+                self.update_person_list()
+            else:
+                self.update_status_bar("Erro ao realizar estorno de presença.", "red")
+                play_error_sound()
         else:
-            self.update_status_bar(f"{nome_display} já teve presença registrada neste evento.", "blue")
-            play_beep_sound()
+            # Pessoa não checada - registrar presença
+            if self.db.record_check_event(cpf, nome_display, self.active_event_id):
+                self.update_status_bar(f"Presença registrada: {nome_display}", "green")
+                play_success_sound()
+                self.update_person_list()
+            else:
+                self.update_status_bar("Erro ao registrar presença.", "red")
+                play_error_sound()
 
     def manual_action(self):
         """Executa ação manual baseada no modo atual."""
@@ -492,7 +503,7 @@ class AttendanceChecker:
         if self.current_mode == "CIO":
             return "Check In/Out"
         else:
-            return "Marcar Presença"
+            return "Marcar/Desmarcar"
 
     def _get_initial_status_message(self):
         """Retorna a mensagem inicial da barra de status."""
@@ -500,7 +511,7 @@ class AttendanceChecker:
             return "Modo CIO: Aponte QR Code para check in/out ou use QR_EVENT para ativar CEV."
         else:
             if self.active_event_id:
-                return "Modo CEV ativo: Aponte QR Code para marcar presença ou QR_EVENT para desativar."
+                return "Modo CEV ativo: Aponte QR Code para marcar/desmarcar presença ou QR_EVENT para desativar."
             else:
                 return "Modo CEV: Use QR_EVENT para iniciar um evento."
 

@@ -310,6 +310,33 @@ class Database:
         self.cursor.execute("SELECT CPF FROM CHECK_EVENT WHERE Event = ?", (event_id,))
         return {row[0] for row in self.cursor.fetchall()}
 
+    def is_person_checked_in_event(self, cpf, event_id):
+        """
+        Verifica se uma pessoa já teve a presença registrada em um evento específico.
+        """
+        if not event_id:
+            return False
+        self.cursor.execute("SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ?", (cpf, event_id))
+        return self.cursor.fetchone() is not None
+
+    def remove_check_event(self, cpf, event_id):
+        """
+        Remove o registro de presença de uma pessoa em um evento (estorno de checagem).
+        Retorna True se o registro foi removido com sucesso, False caso contrário.
+        """
+        if not event_id:
+            return False
+            
+        # Verifica se existe o registro antes de tentar remover
+        self.cursor.execute("SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ?", (cpf, event_id))
+        if not self.cursor.fetchone():
+            return False
+            
+        # Remove o registro
+        self.cursor.execute("DELETE FROM CHECK_EVENT WHERE CPF = ? AND Event = ?", (cpf, event_id))
+        self.conn.commit()
+        return True
+
     def is_person_in_pob(self, cpf):
         """
         Verifica se uma pessoa está atualmente na tabela POB.
