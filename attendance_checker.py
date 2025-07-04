@@ -37,7 +37,7 @@ class AttendanceChecker:
 
         # --- CONFIGURAÇÃO DA JANELA PRINCIPAL ---
         self.title("POBChecker - Controle de Presença")
-        self.geometry("1200x800")
+        self.geometry("1000x700")
 
         # --- INICIALIZAÇÃO DE VARIÁVEIS E BANCO DE DADOS ---
         self.db = Database()
@@ -62,56 +62,56 @@ class AttendanceChecker:
         self.root.grid_rowconfigure(1, weight=1)
 
         # Frame Esquerdo - Câmera e Controles
-        self.left_frame = ctk.CTkFrame(self.root, width=280, corner_radius=0)
+        self.left_frame = ctk.CTkFrame(self.root, width=180, corner_radius=0)
         self.left_frame.grid(row=0, column=0, rowspan=2, sticky="nswe")
         self.left_frame.grid_rowconfigure(1, weight=1)
         self.left_frame.grid_propagate(False)  # Mantém o tamanho fixo
         
-        self.camera_label = ctk.CTkLabel(self.left_frame, text="Câmera", font=ctk.CTkFont(size=14, weight="bold"))
-        self.camera_label.grid(row=0, column=0, padx=5, pady=5)
+        self.camera_label = ctk.CTkLabel(self.left_frame, text="Câmera", font=ctk.CTkFont(size=12, weight="bold"))
+        self.camera_label.grid(row=0, column=0, padx=3, pady=3)
         
-        self.video_canvas = ctk.CTkLabel(self.left_frame, text="", width=260, height=200)
-        self.video_canvas.grid(row=1, column=0, padx=5, pady=5)# sticky="nsew")
+        self.video_canvas = ctk.CTkLabel(self.left_frame, text="", width=160, height=120)
+        self.video_canvas.grid(row=1, column=0, padx=3, pady=3)
         
         # Frame de controles
         self.controls_frame = ctk.CTkFrame(self.left_frame)
-        self.controls_frame.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+        self.controls_frame.grid(row=2, column=0, padx=3, pady=3, sticky="ew")
         
         # Indicador de modo atual
         self.mode_indicator_label = ctk.CTkLabel(
             self.controls_frame, 
             text=f"MODO: {self.current_mode}", 
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=self._get_mode_color()
         )
-        self.mode_indicator_label.pack(padx=5, pady=5)
+        self.mode_indicator_label.pack(padx=3, pady=3)
         
         # Status do evento (apenas para CEV)
         self.event_status_label = ctk.CTkLabel(
             self.controls_frame, 
             text="", 
-            font=ctk.CTkFont(size=10)
+            font=ctk.CTkFont(size=9)
         )
-        self.event_status_label.pack(padx=5, pady=2)
+        self.event_status_label.pack(padx=3, pady=1)
         
         # Frame de pesquisa manual
         self.manual_search_frame = ctk.CTkFrame(self.controls_frame)
-        self.manual_search_frame.pack(padx=5, pady=5, fill="x")
+        self.manual_search_frame.pack(padx=3, pady=3, fill="x")
         
-        self.search_label = ctk.CTkLabel(self.manual_search_frame, text="Pesquisa Manual:", font=ctk.CTkFont(size=10))
-        self.search_label.pack(padx=5, pady=(5, 0))
+        self.search_label = ctk.CTkLabel(self.manual_search_frame, text="Pesquisa Manual:", font=ctk.CTkFont(size=9))
+        self.search_label.pack(padx=3, pady=(3, 0))
         
-        self.search_entry = ctk.CTkEntry(self.manual_search_frame, placeholder_text="Nome ou CPF...", height=28)
-        self.search_entry.pack(padx=5, pady=3, fill="x")
+        self.search_entry = ctk.CTkEntry(self.manual_search_frame, placeholder_text="Nome ou CPF...", height=24)
+        self.search_entry.pack(padx=3, pady=2, fill="x")
         
         self.search_button = ctk.CTkButton(
             self.manual_search_frame, 
             text=self._get_search_button_text(), 
             command=self.manual_action,
-            height=28,
-            font=ctk.CTkFont(size=10)
+            height=24,
+            font=ctk.CTkFont(size=9)
         )
-        self.search_button.pack(padx=5, pady=(0, 5))
+        self.search_button.pack(padx=3, pady=(0, 3))
 
         # Frame Direito - Lista e Estatísticas
         self.right_frame = ctk.CTkFrame(self.root)
@@ -542,7 +542,11 @@ class AttendanceChecker:
 
         # Reseta o grid para uma coluna
         self.right_frame.grid_columnconfigure(0, weight=1)
-        self.right_frame.grid_columnconfigure(1, weight=0)
+        # Remove a coluna 1 do grid para garantir que só uma coluna fique visível
+        self.right_frame.grid_columnconfigure(1, weight=0, minsize=0)
+        # Esconde widgets da coluna 1 se existirem
+        for widget in self.right_frame.grid_slaves(column=1):
+            widget.grid_remove()
         
         # Reajusta o top_controls_frame para uma coluna
         self.top_controls_frame.grid(row=0, column=0, columnspan=1, sticky="ew", padx=10, pady=10)
