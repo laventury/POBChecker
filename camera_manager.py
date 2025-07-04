@@ -76,8 +76,10 @@ class CameraManager:
                     
                     if self.cap.isOpened():
                         # Configura propriedades otimizadas da câmera
-                        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        #self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                        #self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+                        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)                        
                         self.cap.set(cv2.CAP_PROP_FPS, self.fps_target)
                         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduz latência
                         

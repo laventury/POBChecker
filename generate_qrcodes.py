@@ -4,6 +4,7 @@ import sqlite3
 import qrcode
 import os
 import re
+from config import QR_EVENT_CODE
 
 # --- Configurações ---
 DATABASE_FILE = "pob_db.sqlite3"
@@ -89,5 +90,43 @@ def create_qrcodes():
     print(f"\nProcesso concluído! {count} QR Codes foram gerados com sucesso.")
     print("Formato dos QR Codes: CPF|NOME")
 
+def create_qr_event():
+    """
+    Gera o QR Code especial QR_EVENT para ativar/desativar o modo CEV.
+    """
+    print("Gerando QR Code especial QR_EVENT...")
+    
+    # Cria a pasta de saída se não existir
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    
+    # Nome do arquivo para o QR_EVENT
+    filename = "QR_EVENT_CONTROL.png"
+    filepath = os.path.join(OUTPUT_FOLDER, filename)
+    
+    # Configuração do QR Code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Correção média para maior confiabilidade
+        box_size=12,  # Tamanho maior para melhor leitura
+        border=6,     # Borda maior para destaque
+    )
+    
+    # Adiciona o código especial
+    qr.add_data(QR_EVENT_CODE)
+    qr.make(fit=True)
+    
+    # Cria a imagem do QR Code com cores diferentes para destaque
+    img = qr.make_image(fill_color="red", back_color="white")
+    
+    # Salva a imagem
+    img.save(filepath)
+    
+    print(f"  -> QR_EVENT gerado: {filename}")
+    print(f"  -> Código: {QR_EVENT_CODE}")
+    print(f"  -> Função: Ativar/Desativar modo CEV (Check Event)")
+    
+    return filepath
+
 if __name__ == "__main__":
     create_qrcodes()
+    create_qr_event()
