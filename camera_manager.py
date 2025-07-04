@@ -231,7 +231,7 @@ class CameraManager:
             img_ctk = ctk.CTkImage(
                 light_image=img_pil, 
                 dark_image=img_pil, 
-                size=(480, 360)
+                size=(160, 120)
             )
             
             # Atualiza na thread principal

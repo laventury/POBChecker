@@ -3,12 +3,13 @@
 import sqlite3
 from datetime import datetime, timedelta
 
+
 class Database:
     """
     Classe para gerenciar todas as operações do banco de dados SQLite.
     Isso centraliza a lógica do banco de dados em um único lugar.
     """
-    def __init__(self, db_file="pob_db.sqlite3"):
+    def __init__(self, db_file="pobchecker.sqlite3"):
         """
         Inicializa a conexão com o banco de dados e cria as tabelas se não existirem.
         """
@@ -24,12 +25,14 @@ class Database:
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS POB (
                 CPF TEXT PRIMARY KEY,
-                Matricula INTEGER,
-                Nome TEXT NOT NULL,
-                Grupo INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                GroupNumber INTEGER NOT NULL,
                 Onshore INTEGER DEFAULT 1
             )
         ''')
+        
+        # Migra a coluna Group para GroupNumber se necessário
+        self._migrate_group_column()
 
         # Tabela de registro de eventos (sem campo nome, com Open e Close)
         self.cursor.execute('''
@@ -46,7 +49,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS CHECK_EVENT (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 CPF TEXT,
-                Nome TEXT,
+                Name TEXT,
                 Timestamp TEXT NOT NULL,
                 Event INTEGER,
                 FOREIGN KEY (CPF) REFERENCES POB (CPF),
@@ -59,15 +62,12 @@ class Database:
             CREATE TABLE IF NOT EXISTS CHECK_IN_OUT (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 CPF TEXT,
-                Nome TEXT,
-                Tipo TEXT NOT NULL,
+                Name TEXT,
+                Type TEXT NOT NULL,
                 Timestamp TEXT NOT NULL,
                 FOREIGN KEY (CPF) REFERENCES POB (CPF)     
             )
         ''')
-
-        # Migração automática das tabelas antigas
-        self._migrate_old_tables()
         
         self.conn.commit()
 
@@ -77,11 +77,10 @@ class Database:
         """
         try:
             self.cursor.execute('''
-                INSERT INTO POB (CPF, Matricula, Nome, Grupo, Onshore)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO POB (CPF, Name, GroupNumber, Onshore)
+                VALUES (?, ?, ?, ?)
             ''', (
                 person_data['cpf'],
-                person_data.get('matricula'),
                 person_data['nome'],
                 person_data['grupo'],
                 person_data['Onshore']
@@ -111,7 +110,7 @@ class Database:
         """
         Retorna uma lista de todas as pessoas de um determinado grupo.
         """
-        self.cursor.execute("SELECT CPF, Nome, Grupo FROM POB WHERE Grupo = ? ORDER BY Nome", (group_number,))
+        self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE GroupNumber = ? ORDER BY Name", (group_number,))
         return self.cursor.fetchall()
 
     def clean_cpf(self, cpf):
@@ -132,7 +131,7 @@ class Database:
         if not self.validate_cpf(cpf_clean):
             return None
             
-        self.cursor.execute("SELECT CPF, Nome, Grupo FROM POB WHERE CPF = ?", (cpf_clean,))
+        self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE CPF = ?", (cpf_clean,))
         return self.cursor.fetchone()
 
     def find_people_by_search(self, search_term):
@@ -144,18 +143,10 @@ class Database:
         # Se o termo de busca parece ser um CPF, limpa ele para busca
         if search_term.replace(".", "").replace("-", "").replace(" ", "").isdigit():
             cpf_clean = self.clean_cpf(search_term)
-            self.cursor.execute("SELECT CPF, Nome, Grupo FROM POB WHERE Nome LIKE ? OR CPF LIKE ?", (query, cpf_clean))
+            self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE Name LIKE ? OR CPF LIKE ?", (query, cpf_clean))
         else:
-            self.cursor.execute("SELECT CPF, Nome, Grupo FROM POB WHERE Nome LIKE ?", (query,))
+            self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE Name LIKE ?", (query,))
         return self.cursor.fetchall()
-
-    def person_check(self, cpf, nome, event):
-        """
-        Método mantido para compatibilidade - redireciona para record_check_event.
-        """
-        if event:
-            return self.record_check_event(cpf, nome, event)
-        return False
 
     def add_person_to_pob(self, cpf, nome, grupo=1):
         """
@@ -163,7 +154,7 @@ class Database:
         """
         try:
             self.cursor.execute('''
-                INSERT OR REPLACE INTO POB (CPF, Nome, Grupo, Onshore)
+                INSERT OR REPLACE INTO POB (CPF, Name, GroupNumber, Onshore)
                 VALUES (?, ?, ?, 0)
             ''', (cpf, nome, grupo))
             
@@ -217,55 +208,11 @@ class Database:
                 if self.validate_cpf(cpf):
                     person_data = self.find_person_by_cpf(cpf)
                     if person_data:
-                        return cpf, person_data[1]  # CPF, Nome
+                        return cpf, person_data[1]  # CPF, Name
                 return cpf, None
         except Exception as e:
             print(f"Erro ao processar dados do QR Code: {e}")
             return None, None
-
-    def _migrate_old_tables(self):
-        """
-        Migra dados das tabelas antigas para as novas estruturas.
-        """
-        # Verifica se existe a tabela antiga CHECKS e migra para CHECK_EVENT
-        try:
-            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='CHECKS'")
-            if self.cursor.fetchone():
-                print("Database: Migrando dados da tabela CHECKS para CHECK_EVENT")
-                self.cursor.execute('''
-                    INSERT OR IGNORE INTO CHECK_EVENT (CPF, Nome, Timestamp, Event)
-                    SELECT CPF, Nome, Timestamp, Event FROM CHECKS
-                ''')
-                self.conn.commit()
-        except Exception as e:
-            print(f"Erro na migração CHECKS: {e}")
-
-        # Verifica se a tabela EVENTS tem os campos antigos e migra
-        try:
-            self.cursor.execute("PRAGMA table_info(EVENTS)")
-            columns = [row[1] for row in self.cursor.fetchall()]
-            if 'Timestamp' in columns and 'Open' not in columns:
-                print("Database: Migrando estrutura da tabela EVENTS")
-                # Cria nova tabela temporária
-                self.cursor.execute('''
-                    CREATE TABLE EVENTS_NEW (
-                        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Open TEXT NOT NULL,
-                        Close TEXT NULL,
-                        Closed INTEGER DEFAULT 0   
-                    )
-                ''')
-                # Migra dados antigos
-                self.cursor.execute('''
-                    INSERT INTO EVENTS_NEW (ID, Open, Close, Closed)
-                    SELECT ID, Timestamp, Closed_Timestamp, Closed FROM EVENTS
-                ''')
-                # Remove tabela antiga e renomeia
-                self.cursor.execute('DROP TABLE EVENTS')
-                self.cursor.execute('ALTER TABLE EVENTS_NEW RENAME TO EVENTS')
-                self.conn.commit()
-        except Exception as e:
-            print(f"Erro na migração EVENTS: {e}")
 
     def clean_old_records(self):
         """
@@ -328,7 +275,7 @@ class Database:
         """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.cursor.execute('''
-            INSERT INTO CHECK_IN_OUT (CPF, Nome, Tipo, Timestamp)
+            INSERT INTO CHECK_IN_OUT (CPF, Name, Type, Timestamp)
             VALUES (?, ?, ?, ?)
         ''', (cpf, nome, tipo, timestamp))
         self.conn.commit()
@@ -348,7 +295,7 @@ class Database:
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.cursor.execute('''
-            INSERT INTO CHECK_EVENT (CPF, Nome, Timestamp, Event) 
+            INSERT INTO CHECK_EVENT (CPF, Name, Timestamp, Event) 
             VALUES (?, ?, ?, ?)
         ''', (cpf, nome, timestamp, event_id))
         self.conn.commit()
@@ -378,10 +325,9 @@ class Database:
         try:
             self.cursor.execute('''
                 UPDATE POB 
-                SET Matricula = ?, Nome = ?, Grupo = ?
+                SET Name = ?, GroupNumber = ?
                 WHERE CPF = ?
             ''', (
-                person_data.get('matricula'),
                 person_data['nome'],
                 person_data['grupo'],
                 cpf
@@ -422,8 +368,55 @@ class Database:
         Retorna todos os detalhes de uma pessoa pelo CPF.
         """
         cpf_clean = self.clean_cpf(cpf)
-        self.cursor.execute("SELECT CPF, Matricula, Nome, Grupo FROM POB WHERE CPF = ?", (cpf_clean,))
+        self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE CPF = ?", (cpf_clean,))
         return self.cursor.fetchone()
+
+    def _migrate_group_column(self):
+        """
+        Migra a coluna 'Group' para 'GroupNumber' se a tabela já existir com a estrutura antiga.
+        """
+        try:
+            # Verifica se a coluna 'Group' existe
+            self.cursor.execute("PRAGMA table_info(POB)")
+            columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'Group' in columns and 'GroupNumber' not in columns:
+                # Precisa migrar: renomear Group para GroupNumber
+                # SQLite não suporta ALTER COLUMN, então precisamos recriar a tabela
+                
+                # 1. Criar tabela temporária com nova estrutura
+                self.cursor.execute('''
+                    CREATE TABLE POB_temp (
+                        CPF TEXT PRIMARY KEY,
+                        Name TEXT NOT NULL,
+                        GroupNumber INTEGER NOT NULL,
+                        Onshore INTEGER DEFAULT 1
+                    )
+                ''')
+                
+                # 2. Copiar dados da tabela original
+                self.cursor.execute('''
+                    INSERT INTO POB_temp (CPF, Name, GroupNumber, Onshore)
+                    SELECT CPF, Name, [Group], Onshore FROM POB
+                ''')
+                
+                # 3. Remover tabela original
+                self.cursor.execute('DROP TABLE POB')
+                
+                # 4. Renomear tabela temporária
+                self.cursor.execute('ALTER TABLE POB_temp RENAME TO POB')
+                
+                self.conn.commit()
+                print("Migração concluída: coluna 'Group' renomeada para 'GroupNumber'")
+                
+        except Exception as e:
+            print(f"Erro durante migração da coluna Group: {e}")
+            # Em caso de erro, tenta reverter se possível
+            try:
+                self.cursor.execute('DROP TABLE IF EXISTS POB_temp')
+                self.conn.commit()
+            except:
+                pass
 
     def __del__(self):
         """

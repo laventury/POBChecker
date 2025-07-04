@@ -53,7 +53,6 @@ def populate_database():
         print(f"\nGerando {num_people} pessoas...")
         
         generated_cpfs = set()
-        matricula_counter = 1000
         
         for i in range(num_people):
             # Gera CPF único
@@ -67,11 +66,9 @@ def populate_database():
             nome = fake.name()
             grupo = random.randint(1, 5)  # Grupos de 1 a 5
             onshore = random.choice([0, 1])  # 0 = Offshore, 1 = Onshore
-            matricula_counter += 1
             
             person_data = {
                 'cpf': cpf,
-                'matricula': matricula_counter,
                 'nome': nome,
                 'grupo': grupo,
                 'Onshore': onshore

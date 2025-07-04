@@ -37,7 +37,7 @@ class AttendanceChecker:
 
         # --- CONFIGURAÇÃO DA JANELA PRINCIPAL ---
         self.title("POBChecker - Controle de Presença")
-        self.geometry("1200x800")
+        self.geometry("1000x700")
 
         # --- INICIALIZAÇÃO DE VARIÁVEIS E BANCO DE DADOS ---
         self.db = Database()
@@ -62,53 +62,56 @@ class AttendanceChecker:
         self.root.grid_rowconfigure(1, weight=1)
 
         # Frame Esquerdo - Câmera e Controles
-        self.left_frame = ctk.CTkFrame(self.root, width=350, corner_radius=0)
+        self.left_frame = ctk.CTkFrame(self.root, width=180, corner_radius=0)
         self.left_frame.grid(row=0, column=0, rowspan=2, sticky="nswe")
         self.left_frame.grid_rowconfigure(1, weight=1)
+        self.left_frame.grid_propagate(False)  # Mantém o tamanho fixo
         
-        self.camera_label = ctk.CTkLabel(self.left_frame, text="Câmera")
-        self.camera_label.grid(row=0, column=0, padx=10, pady=10)
+        self.camera_label = ctk.CTkLabel(self.left_frame, text="Câmera", font=ctk.CTkFont(size=12, weight="bold"))
+        self.camera_label.grid(row=0, column=0, padx=3, pady=3)
         
-        self.video_canvas = ctk.CTkLabel(self.left_frame, text="")
-        self.video_canvas.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.video_canvas = ctk.CTkLabel(self.left_frame, text="", width=160, height=120)
+        self.video_canvas.grid(row=1, column=0, padx=3, pady=3)
         
         # Frame de controles
         self.controls_frame = ctk.CTkFrame(self.left_frame)
-        self.controls_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+        self.controls_frame.grid(row=2, column=0, padx=3, pady=3, sticky="ew")
         
         # Indicador de modo atual
         self.mode_indicator_label = ctk.CTkLabel(
             self.controls_frame, 
             text=f"MODO: {self.current_mode}", 
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=self._get_mode_color()
         )
-        self.mode_indicator_label.pack(padx=10, pady=10)
+        self.mode_indicator_label.pack(padx=3, pady=3)
         
         # Status do evento (apenas para CEV)
         self.event_status_label = ctk.CTkLabel(
             self.controls_frame, 
             text="", 
-            font=ctk.CTkFont(size=12)
+            font=ctk.CTkFont(size=9)
         )
-        self.event_status_label.pack(padx=10, pady=5)
+        self.event_status_label.pack(padx=3, pady=1)
         
         # Frame de pesquisa manual
         self.manual_search_frame = ctk.CTkFrame(self.controls_frame)
-        self.manual_search_frame.pack(padx=10, pady=10, fill="x")
+        self.manual_search_frame.pack(padx=3, pady=3, fill="x")
         
-        self.search_label = ctk.CTkLabel(self.manual_search_frame, text="Pesquisa Manual (Nome ou CPF):")
-        self.search_label.pack(padx=10, pady=(10, 0))
+        self.search_label = ctk.CTkLabel(self.manual_search_frame, text="Pesquisa Manual:", font=ctk.CTkFont(size=9))
+        self.search_label.pack(padx=3, pady=(3, 0))
         
-        self.search_entry = ctk.CTkEntry(self.manual_search_frame, placeholder_text="Digite para pesquisar...")
-        self.search_entry.pack(padx=10, pady=5, fill="x")
+        self.search_entry = ctk.CTkEntry(self.manual_search_frame, placeholder_text="Nome ou CPF...", height=24)
+        self.search_entry.pack(padx=3, pady=2, fill="x")
         
         self.search_button = ctk.CTkButton(
             self.manual_search_frame, 
             text=self._get_search_button_text(), 
-            command=self.manual_action
+            command=self.manual_action,
+            height=24,
+            font=ctk.CTkFont(size=9)
         )
-        self.search_button.pack(padx=10, pady=(0, 10))
+        self.search_button.pack(padx=3, pady=(0, 3))
 
         # Frame Direito - Lista e Estatísticas
         self.right_frame = ctk.CTkFrame(self.root)
@@ -118,7 +121,7 @@ class AttendanceChecker:
 
         # Controles Superiores
         self.top_controls_frame = ctk.CTkFrame(self.right_frame)
-        self.top_controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        self.top_controls_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
         self.top_controls_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
         
         self.group_selector = ctk.CTkSegmentedButton(
@@ -336,8 +339,16 @@ class AttendanceChecker:
     def _update_cio_list(self):
         """Atualiza lista para modo CIO - apenas pessoas no POB."""
         # Limpa lista atual
-        if hasattr(self, 'scrollable_frame'):
+        if hasattr(self, 'scrollable_frame') and self.scrollable_frame.winfo_exists():
             for widget in self.scrollable_frame.winfo_children():
+                widget.destroy()
+        
+        # Limpa frames do modo CEV se existirem
+        if hasattr(self, 'unchecked_frame') and self.unchecked_frame.winfo_exists():
+            for widget in self.unchecked_frame.winfo_children():
+                widget.destroy()
+        if hasattr(self, 'checked_frame') and self.checked_frame.winfo_exists():
+            for widget in self.checked_frame.winfo_children():
                 widget.destroy()
         
         self.person_widgets.clear()
@@ -347,29 +358,35 @@ class AttendanceChecker:
         # Filtra apenas pessoas que estão realmente no POB (Onshore = 0)
         people_in_pob = [p for p in people if self.db.is_person_in_pob(p[0])]
 
-        for person in people_in_pob:
-            cpf, nome, _ = person
-            
-            row_frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
-            row_frame.pack(fill="x", pady=2, padx=2)
+        if hasattr(self, 'scrollable_frame') and self.scrollable_frame.winfo_exists():
+            for person in people_in_pob:
+                cpf, nome, _ = person
+                
+                row_frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
+                row_frame.pack(fill="x", pady=2, padx=2)
 
-            label_nome = ctk.CTkLabel(row_frame, text=nome, anchor="w")
-            label_nome.pack(side="left", padx=10, pady=5, expand=True, fill="x")
-            
-            label_cpf = ctk.CTkLabel(row_frame, text=cpf, anchor="e", width=150)
-            label_cpf.pack(side="right", padx=10, pady=5)
-            
-            self.person_widgets[cpf] = row_frame
+                label_nome = ctk.CTkLabel(row_frame, text=nome, anchor="w")
+                label_nome.pack(side="left", padx=10, pady=5, expand=True, fill="x")
+                
+                label_cpf = ctk.CTkLabel(row_frame, text=cpf, anchor="e", width=150)
+                label_cpf.pack(side="right", padx=10, pady=5)
+                
+                self.person_widgets[cpf] = row_frame
 
         self._update_cio_stats(len(people_in_pob))
 
     def _update_cev_list(self):
         """Atualiza listas para modo CEV - separadas por checados/não checados."""
-        # Limpa listas atuais
-        if hasattr(self, 'unchecked_frame'):
+        # Limpa lista do modo CIO se existir
+        if hasattr(self, 'scrollable_frame') and self.scrollable_frame.winfo_exists():
+            for widget in self.scrollable_frame.winfo_children():
+                widget.destroy()
+        
+        # Limpa listas atuais do modo CEV
+        if hasattr(self, 'unchecked_frame') and self.unchecked_frame.winfo_exists():
             for widget in self.unchecked_frame.winfo_children():
                 widget.destroy()
-        if hasattr(self, 'checked_frame'):
+        if hasattr(self, 'checked_frame') and self.checked_frame.winfo_exists():
             for widget in self.checked_frame.winfo_children():
                 widget.destroy()
         
@@ -394,34 +411,36 @@ class AttendanceChecker:
                 unchecked_people.append(person)
 
         # Preenche lista de não checados
-        for person in unchecked_people:
-            cpf, nome, _ = person
-            
-            row_frame = ctk.CTkFrame(self.unchecked_frame, fg_color="#FFF2F2")  # Fundo vermelho claro
-            row_frame.pack(fill="x", pady=2, padx=2)
+        if hasattr(self, 'unchecked_frame') and self.unchecked_frame.winfo_exists():
+            for person in unchecked_people:
+                cpf, nome, _ = person
+                
+                row_frame = ctk.CTkFrame(self.unchecked_frame, fg_color="#FFF2F2")  # Fundo vermelho claro
+                row_frame.pack(fill="x", pady=2, padx=2)
 
-            label_nome = ctk.CTkLabel(row_frame, text=nome, anchor="w", fg_color="transparent")
-            label_nome.pack(side="left", padx=10, pady=5, expand=True, fill="x")
-            
-            label_cpf = ctk.CTkLabel(row_frame, text=cpf, anchor="e", width=120, fg_color="transparent")
-            label_cpf.pack(side="right", padx=10, pady=5)
-            
-            self.person_widgets[f"unchecked_{cpf}"] = row_frame
+                label_nome = ctk.CTkLabel(row_frame, text=nome, anchor="w", fg_color="transparent")
+                label_nome.pack(side="left", padx=10, pady=5, expand=True, fill="x")
+                
+                label_cpf = ctk.CTkLabel(row_frame, text=cpf, anchor="e", width=120, fg_color="transparent")
+                label_cpf.pack(side="right", padx=10, pady=5)
+                
+                self.person_widgets[f"unchecked_{cpf}"] = row_frame
 
         # Preenche lista de checados
-        for person in checked_people:
-            cpf, nome, _ = person
-            
-            row_frame = ctk.CTkFrame(self.checked_frame, fg_color="#F0F8F0")  # Fundo verde claro
-            row_frame.pack(fill="x", pady=2, padx=2)
+        if hasattr(self, 'checked_frame') and self.checked_frame.winfo_exists():
+            for person in checked_people:
+                cpf, nome, _ = person
+                
+                row_frame = ctk.CTkFrame(self.checked_frame, fg_color="#F0F8F0")  # Fundo verde claro
+                row_frame.pack(fill="x", pady=2, padx=2)
 
-            label_nome = ctk.CTkLabel(row_frame, text=nome, anchor="w", fg_color="transparent")
-            label_nome.pack(side="left", padx=10, pady=5, expand=True, fill="x")
-            
-            label_cpf = ctk.CTkLabel(row_frame, text=cpf, anchor="e", width=120, fg_color="transparent")
-            label_cpf.pack(side="right", padx=10, pady=5)
-            
-            self.person_widgets[f"checked_{cpf}"] = row_frame
+                label_nome = ctk.CTkLabel(row_frame, text=nome, anchor="w", fg_color="transparent")
+                label_nome.pack(side="left", padx=10, pady=5, expand=True, fill="x")
+                
+                label_cpf = ctk.CTkLabel(row_frame, text=cpf, anchor="e", width=120, fg_color="transparent")
+                label_cpf.pack(side="right", padx=10, pady=5)
+                
+                self.person_widgets[f"checked_{cpf}"] = row_frame
 
         self._update_cev_stats(len(checked_people), len(unchecked_people))
 
@@ -506,10 +525,31 @@ class AttendanceChecker:
 
     def _setup_cio_interface(self):
         """Configura interface para modo CIO."""
-        # Remove frames antigos se existirem
+        # Remove frames antigos se existirem e limpa todas as referências
         for widget in self.right_frame.winfo_children():
-            if hasattr(widget, '_is_list_container'):
+            if hasattr(widget, '_is_list_container') or hasattr(widget, '_is_cev_header'):
                 widget.destroy()
+
+        # Limpa referências de frames do modo CEV
+        if hasattr(self, 'unchecked_frame'):
+            delattr(self, 'unchecked_frame')
+        if hasattr(self, 'checked_frame'):
+            delattr(self, 'checked_frame')
+        if hasattr(self, 'unchecked_header'):
+            delattr(self, 'unchecked_header')
+        if hasattr(self, 'checked_header'):
+            delattr(self, 'checked_header')
+
+        # Reseta o grid para uma coluna
+        self.right_frame.grid_columnconfigure(0, weight=1)
+        # Remove a coluna 1 do grid para garantir que só uma coluna fique visível
+        self.right_frame.grid_columnconfigure(1, weight=0, minsize=0)
+        # Esconde widgets da coluna 1 se existirem
+        for widget in self.right_frame.grid_slaves(column=1):
+            widget.grid_remove()
+        
+        # Reajusta o top_controls_frame para uma coluna
+        self.top_controls_frame.grid(row=0, column=0, columnspan=1, sticky="ew", padx=10, pady=10)
 
         # Lista de Pessoas no POB
         self.list_header = ctk.CTkLabel(
@@ -518,6 +558,7 @@ class AttendanceChecker:
             font=ctk.CTkFont(size=16, weight="bold")
         )
         self.list_header.grid(row=1, column=0, pady=(0, 5), sticky="w", padx=10)
+        self.list_header._is_list_container = True
         
         self.scrollable_frame = ctk.CTkScrollableFrame(self.right_frame, label_text="")
         self.scrollable_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
@@ -526,13 +567,23 @@ class AttendanceChecker:
 
     def _setup_cev_interface(self):
         """Configura interface para modo CEV com duas listas."""
-        # Remove frames antigos se existirem
+        # Remove frames antigos se existirem e limpa todas as referências
         for widget in self.right_frame.winfo_children():
-            if hasattr(widget, '_is_list_container'):
+            if hasattr(widget, '_is_list_container') or hasattr(widget, '_is_cev_header'):
                 widget.destroy()
 
-        # Configura grid para duas colunas
-        self.right_frame.grid_columnconfigure((0, 1), weight=1)
+        # Limpa referências de frames do modo CIO
+        if hasattr(self, 'scrollable_frame'):
+            delattr(self, 'scrollable_frame')
+        if hasattr(self, 'list_header'):
+            delattr(self, 'list_header')
+
+        # Configura grid para duas colunas iguais
+        self.right_frame.grid_columnconfigure(0, weight=1)
+        self.right_frame.grid_columnconfigure(1, weight=1)
+        
+        # Reajusta o top_controls_frame para duas colunas
+        self.top_controls_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
 
         # Lista de Não Checados (esquerda)
         self.unchecked_header = ctk.CTkLabel(
@@ -542,6 +593,7 @@ class AttendanceChecker:
             text_color="#EA4335"
         )
         self.unchecked_header.grid(row=1, column=0, pady=(0, 5), sticky="w", padx=10)
+        self.unchecked_header._is_cev_header = True
         
         self.unchecked_frame = ctk.CTkScrollableFrame(self.right_frame, label_text="")
         self.unchecked_frame.grid(row=2, column=0, sticky="nsew", padx=(10, 5), pady=5)
@@ -556,6 +608,7 @@ class AttendanceChecker:
             text_color="#34A853"
         )
         self.checked_header.grid(row=1, column=1, pady=(0, 5), sticky="w", padx=10)
+        self.checked_header._is_cev_header = True
         
         self.checked_frame = ctk.CTkScrollableFrame(self.right_frame, label_text="")
         self.checked_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=5)

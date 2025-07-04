@@ -52,8 +52,6 @@ class PersonnelManager(ctk.CTkToplevel):
         self.cpf_entry.pack(pady=10, padx=20, fill="x")
         self.nome_entry = ctk.CTkEntry(self.form_frame, placeholder_text="Nome Completo")
         self.nome_entry.pack(pady=10, padx=20, fill="x")
-        self.matricula_entry = ctk.CTkEntry(self.form_frame, placeholder_text="Matrícula (opcional)")
-        self.matricula_entry.pack(pady=10, padx=20, fill="x")
         self.grupo_entry = ctk.CTkEntry(self.form_frame, placeholder_text="Grupo (1 ou 2)")
         self.grupo_entry.pack(pady=10, padx=20, fill="x")
         self.button_frame = ctk.CTkFrame(self.form_frame)
@@ -99,7 +97,6 @@ class PersonnelManager(ctk.CTkToplevel):
         """Limpa todos os campos do formulário."""
         self.cpf_entry.delete(0, "end")
         self.nome_entry.delete(0, "end")
-        self.matricula_entry.delete(0, "end")
         self.grupo_entry.delete(0, "end")
         self.current_editing_cpf = None
         self.update_save_button_text()
@@ -113,7 +110,6 @@ class PersonnelManager(ctk.CTkToplevel):
         """Salva uma nova pessoa ou atualiza uma existente."""
         cpf = self.cpf_entry.get().strip()
         nome = self.nome_entry.get().strip()
-        matricula = self.matricula_entry.get().strip()
         grupo = self.grupo_entry.get().strip()
 
         # Validações
@@ -129,15 +125,6 @@ class PersonnelManager(ctk.CTkToplevel):
             self.update_status("Erro: Grupo deve ser 1 ou 2!", "red")
             return
 
-        # Converte matrícula para int se não estiver vazia
-        matricula_int = None
-        if matricula:
-            try:
-                matricula_int = int(matricula)
-            except ValueError:
-                self.update_status("Erro: Matrícula deve ser um número!", "red")
-                return
-
         # Remove formatação do CPF
         cpf_clean = self.clean_cpf(cpf)
 
@@ -145,7 +132,6 @@ class PersonnelManager(ctk.CTkToplevel):
         person_data = {
             'cpf': cpf_clean,
             'nome': nome,
-            'matricula': matricula_int,
             'grupo': int(grupo),
             'Onshore': 1
         }
@@ -204,7 +190,7 @@ class PersonnelManager(ctk.CTkToplevel):
         person_data = self.db.get_person_details(cpf_clean)
         
         if person_data:
-            cpf_db, matricula, nome, grupo = person_data
+            cpf_db, nome, grupo = person_data
             
             # Preenche os campos
             self.cpf_entry.delete(0, "end")
@@ -212,10 +198,6 @@ class PersonnelManager(ctk.CTkToplevel):
             
             self.nome_entry.delete(0, "end")
             self.nome_entry.insert(0, nome)
-            
-            self.matricula_entry.delete(0, "end")
-            if matricula:
-                self.matricula_entry.insert(0, str(matricula))
             
             self.grupo_entry.delete(0, "end")
             self.grupo_entry.insert(0, str(grupo))
@@ -355,15 +337,13 @@ class PersonnelManager(ctk.CTkToplevel):
         person_data = self.db.get_person_details(cpf)
         
         if person_data:
-            cpf_db, matricula, nome, grupo = person_data
+            cpf_db, nome, grupo = person_data
             
             # Limpa e preenche os campos
             self.clear_fields()
             
             self.cpf_entry.insert(0, cpf_db)
             self.nome_entry.insert(0, nome)
-            if matricula:
-                self.matricula_entry.insert(0, str(matricula))
             self.grupo_entry.insert(0, str(grupo))
             
             self.current_editing_cpf = cpf  # Define que estamos editando esta pessoa
