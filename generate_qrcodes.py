@@ -7,7 +7,7 @@ import re
 from config import QR_EVENT_CODE
 
 # --- Configurações ---
-DATABASE_FILE = "pob_db.sqlite3"
+DATABASE_FILE = "pobchecker.sqlite3"
 OUTPUT_FOLDER = "qrcodes_cpf"
 
 def sanitize_filename(name):
