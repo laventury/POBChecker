@@ -63,21 +63,36 @@ class AttendanceChecker:
         self.root.grid_rowconfigure(1, weight=1)
 
         # Frame Esquerdo - Câmera e Controles
-        self.left_frame = ctk.CTkFrame(self.root, width=180, corner_radius=0)
-        self.left_frame.grid(row=0, column=0, rowspan=2, sticky="nswe")
+        self.left_frame = ctk.CTkFrame(self.root, width=180)
+        self.left_frame.grid(row=0, column=0, rowspan=2, padx=(10,0), pady=10, sticky="nswe")
         self.left_frame.grid_rowconfigure(1, weight=1)
         self.left_frame.grid_propagate(False)  # Mantém o tamanho fixo
+       
+        # Estatísticas
+        self.stats_frame = ctk.CTkFrame(self.left_frame)
+        self.stats_frame.pack(side="top", padx=5, pady=5, fill="x")
         
+        self.total_label = ctk.CTkLabel(self.stats_frame, text="Total: 0", font=ctk.CTkFont(size=14, weight="bold"))
+        self.total_label.pack(side="top", padx=10)
+        
+        self.checked_label = ctk.CTkLabel(self.stats_frame, text="Checados: 0", font=ctk.CTkFont(size=14, weight="bold"), text_color="#34A853")
+        self.checked_label.pack(side="top", padx=10)
+        
+        self.unchecked_label = ctk.CTkLabel(self.stats_frame, text="Não Checados: 0", font=ctk.CTkFont(size=14, weight="bold"), text_color="#EA4335")
+        self.unchecked_label.pack(side="top", padx=10)
+
+        # Controle de Camera
+
         self.camera_label = ctk.CTkLabel(self.left_frame, text="Câmera", font=ctk.CTkFont(size=12, weight="bold"))
-        self.camera_label.grid(row=0, column=0, padx=3, pady=3)
+        self.camera_label.pack(side="top", padx=5, pady=(5, 0), fill="x")
         
         self.video_canvas = ctk.CTkLabel(self.left_frame, text="", width=160, height=120)
-        self.video_canvas.grid(row=1, column=0, padx=3, pady=3)
-        
+        self.video_canvas.pack(side="top", padx=5, pady=(0, 5), fill="x")
+
         # Frame de controles
         self.controls_frame = ctk.CTkFrame(self.left_frame)
-        self.controls_frame.grid(row=2, column=0, padx=3, pady=3, sticky="ew")
-        
+        self.controls_frame.pack(side="top", fill="x", padx=5, pady=(0, 5))
+
         # Indicador de modo atual
         self.mode_indicator_label = ctk.CTkLabel(
             self.controls_frame, 
@@ -85,26 +100,26 @@ class AttendanceChecker:
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=self._get_mode_color()
         )
-        self.mode_indicator_label.pack(padx=3, pady=3)
-        
+        self.mode_indicator_label.pack(side="top", padx=3, pady=3)
+
         # Status do evento (apenas para CEV)
         self.event_status_label = ctk.CTkLabel(
             self.controls_frame, 
             text="", 
             font=ctk.CTkFont(size=9)
         )
-        self.event_status_label.pack(padx=3, pady=1)
-        
+        self.event_status_label.pack(side="top", padx=3, pady=1)
+
         # Frame de pesquisa manual
         self.manual_search_frame = ctk.CTkFrame(self.controls_frame)
-        self.manual_search_frame.pack(padx=3, pady=3, fill="x")
-        
+        self.manual_search_frame.pack(side="top", padx=3, pady=3, fill="x")
+
         self.search_label = ctk.CTkLabel(self.manual_search_frame, text="Pesquisa Manual:", font=ctk.CTkFont(size=9))
-        self.search_label.pack(padx=3, pady=(3, 0))
-        
+        self.search_label.pack(side="top", padx=3, pady=(3, 0))
+
         self.search_entry = ctk.CTkEntry(self.manual_search_frame, placeholder_text="Nome ou CPF...", height=24)
-        self.search_entry.pack(padx=3, pady=2, fill="x")
-        
+        self.search_entry.pack(side="top", padx=3, pady=2, fill="x")
+
         self.search_button = ctk.CTkButton(
             self.manual_search_frame, 
             text=self._get_search_button_text(), 
@@ -112,39 +127,26 @@ class AttendanceChecker:
             height=24,
             font=ctk.CTkFont(size=9)
         )
-        self.search_button.pack(padx=3, pady=(0, 3))
+        self.search_button.pack(side="top", padx=3, pady=(0, 3))
+
+        # Controles de seleçao de grupo
+
+        self.group_selector_frame = ctk.CTkFrame(self.left_frame)
+        self.group_selector_frame.pack(side="top", fill="x", padx=5, pady=5)
+        
+        self.group_selector = ctk.CTkSegmentedButton(
+            self.group_selector_frame, 
+            values=["Grupo 1", "Grupo 2"], 
+            command=self.change_group
+        )
+        self.group_selector.set("Grupo 1")
+        self.group_selector.pack(side="top", padx=5, pady=(5, 0), fill="x")
 
         # Frame Direito - Lista e Estatísticas
         self.right_frame = ctk.CTkFrame(self.root)
         self.right_frame.grid(row=0, column=1, rowspan=2, sticky="nswe", padx=10, pady=10)
         self.right_frame.grid_columnconfigure(0, weight=1)
         self.right_frame.grid_rowconfigure(2, weight=1)
-
-        # Controles Superiores
-        self.top_controls_frame = ctk.CTkFrame(self.right_frame)
-        self.top_controls_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
-        self.top_controls_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
-        
-        self.group_selector = ctk.CTkSegmentedButton(
-            self.top_controls_frame, 
-            values=["Grupo 1", "Grupo 2"], 
-            command=self.change_group
-        )
-        self.group_selector.set("Grupo 1")
-        self.group_selector.grid(row=0, column=0, padx=5, pady=5)
-        
-        # Estatísticas
-        self.stats_frame = ctk.CTkFrame(self.top_controls_frame)
-        self.stats_frame.grid(row=0, column=1, columnspan=3, padx=5, pady=5, sticky="e")
-        
-        self.total_label = ctk.CTkLabel(self.stats_frame, text="Total: 0", font=ctk.CTkFont(size=14, weight="bold"))
-        self.total_label.pack(side="left", padx=10)
-        
-        self.checked_label = ctk.CTkLabel(self.stats_frame, text="Checados: 0", font=ctk.CTkFont(size=14, weight="bold"), text_color="#34A853")
-        self.checked_label.pack(side="left", padx=10)
-        
-        self.unchecked_label = ctk.CTkLabel(self.stats_frame, text="Não Checados: 0", font=ctk.CTkFont(size=14, weight="bold"), text_color="#EA4335")
-        self.unchecked_label.pack(side="left", padx=10)
         
         # Configuração da interface baseada no modo
         self._setup_mode_interface()
@@ -458,7 +460,7 @@ class AttendanceChecker:
 
     def _update_cio_stats(self, total_in_pob):
         """Atualiza estatísticas para modo CIO."""
-        self.total_label.configure(text=f"No POB: {total_in_pob}")
+        self.total_label.configure(text=f"Total: {total_in_pob}")
         self.checked_label.configure(text="")
         self.unchecked_label.configure(text="")
 
@@ -560,9 +562,6 @@ class AttendanceChecker:
         for widget in self.right_frame.grid_slaves(column=1):
             widget.grid_remove()
         
-        # Reajusta o top_controls_frame para uma coluna
-        self.top_controls_frame.grid(row=0, column=0, columnspan=1, sticky="ew", padx=10, pady=10)
-
         # Lista de Pessoas no POB
         self.list_header = ctk.CTkLabel(
             self.right_frame, 
@@ -594,9 +593,6 @@ class AttendanceChecker:
         self.right_frame.grid_columnconfigure(0, weight=1)
         self.right_frame.grid_columnconfigure(1, weight=1)
         
-        # Reajusta o top_controls_frame para duas colunas
-        self.top_controls_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
-
         # Lista de Não Checados (esquerda)
         self.unchecked_header = ctk.CTkLabel(
             self.right_frame, 
