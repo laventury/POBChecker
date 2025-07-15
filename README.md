@@ -8,6 +8,8 @@ O **POBChecker** é um sistema desenvolvido para controle de presença do POB (P
 
 - **Controle de Embarque/Desembarque**: Monitoramento em tempo real de pessoas a bordo da plataforma
 - **Controle de Presença em Eventos**: Sistema de verificação de presença para reuniões, alarmes e procedimentos de segurança
+- **Arquitetura Distribuída**: Terminais locais sincronizados com servidor central
+- **Sincronização em Rede**: Dados consolidados automaticamente entre múltiplos terminais
 - **Compatibilidade Raspberry Pi**: Otimizado para funcionar em dispositivos embarcados 
 - **Sistema Linux**: Totalmente compatível com ambientes Linux para uso em plataformas offshore
 - **Interface Intuitiva**: Interface gráfica moderna e de fácil utilização
@@ -25,6 +27,7 @@ O **POBChecker** é um sistema desenvolvido para controle de presença do POB (P
 - **Câmera USB** ou **Câmera do Raspberry Pi**
 - **Tela de 7" ou superior** para interface touch
 - **Armazenamento**: MicroSD 32GB (Classe 10)
+- **Rede**: Ethernet ou WiFi para sincronização entre terminais
 
 ## 🚀 Instalação
 
@@ -33,6 +36,7 @@ O **POBChecker** é um sistema desenvolvido para controle de presença do POB (P
 - Python 3.7 ou superior
 - Câmera conectada (USB ou integrada)
 - Conexão com a internet (para instalação inicial)
+- Rede local (para sincronização multi-terminal - opcional)
 
 ### Instalação no Raspberry Pi (Recomendado)
 
@@ -51,10 +55,13 @@ cd POBChecker
 python3 -m venv venv
 source venv/bin/activate
 
-# Instale dependências Python
+# Instale dependências Python básicas
 pip install -r requirements.txt
 
-# Execute o sistema principal
+# Para funcionalidades de rede (opcional)
+pip install -r requirements_network.txt
+
+# Execute o sistema principal (terminal local)
 python pobchecker_terminal.py
 ```
 
@@ -71,6 +78,9 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+# Para funcionalidades de rede (opcional)
+pip install -r requirements_network.txt
+
 # Execute
 python pobchecker_terminal.py
 ```
@@ -78,11 +88,54 @@ python pobchecker_terminal.py
 ### Instalação no Windows (Desenvolvimento)
 
 ```powershell
-# Instale as dependências Python
+# Instale as dependências Python básicas
 pip install -r requirements.txt
 
-# Execute o aplicativo principal
+# Para funcionalidades de rede (opcional)
+pip install -r requirements_network.txt
+
+# Execute o aplicativo principal (terminal local)
 python pobchecker_terminal.py
+```
+
+## 🌐 Arquitetura do Sistema
+
+O POBChecker possui uma arquitetura distribuída que pode operar em dois modos:
+
+### 1. **Modo Terminal Local** (Standalone)
+- Operação independente sem necessidade de rede
+- Dados armazenados localmente no SQLite
+- Interface gráfica completa (`pobchecker_terminal.py`)
+
+### 2. **Modo Servidor Central** (Consolidador)
+- Servidor central que consolida dados de múltiplos terminais
+- Interface web para monitoramento (`pobchecker_server.py`)
+- Suporte a PostgreSQL para alta disponibilidade
+- Sincronização automática com terminais
+
+### 3. **Sincronização em Rede**
+- Descoberta automática de serviços via mDNS
+- Sincronização temporal com servidores NTP
+- Dados consolidados automaticamente
+- Fallback para operação offline
+
+## 🚀 Modos de Execução
+
+### Terminal Local (Recomendado para início)
+```bash
+python pobchecker_terminal.py
+```
+
+### Servidor Central (Para consolidação)
+```bash
+python run_server.py
+# ou
+python pobchecker_server.py
+```
+
+### Demo e Testes
+```bash
+python demo_system.py
 ```
 
 ## 📱 Funcionalidades
@@ -111,14 +164,28 @@ O sistema opera em dois modos principais que podem ser alternados durante o uso:
    - Alternância entre modos CIO e CEV
    - Pesquisa manual por nome ou CPF
    - Controle por grupos (Grupo 1 e Grupo 2)
+   - Sincronização automática com servidor (se disponível)
+
+2. **Servidor Central** (`pobchecker_server.py`)
+   - API REST para consolidação de dados
+   - Interface web para monitoramento
+   - Suporte a PostgreSQL e SQLite
+   - Descoberta automática de terminais
+   - Relatórios consolidados
    
-2. **Utilitários Helper** (pasta `helper/`)
+3. **Serviços de Rede**
+   - `sync_service.py` - Sincronização de dados entre terminais
+   - `network_discovery.py` - Descoberta automática de serviços
+   - `time_sync.py` - Sincronização temporal via NTP
+   - `database_postgres.py` - Suporte a PostgreSQL
+
+4. **Utilitários Helper** (pasta `helper/`)
    - `helper_generate_qrcodes.py` - Geração de QR Codes no formato CPF|Nome
    - `helper_clear_data.py` - Limpeza de dados do sistema
    - `helper_pob_generate.py` - Geração de dados de teste
    - `helper_auto_clear_data.py` - Limpeza automática de registros antigos
    
-3. **Banco de Dados** (`database.py`)
+5. **Banco de Dados** (`database.py`)
    - SQLite para persistência local
    - Tabelas: POB, EVENTS, CHECK_EVENT, CHECK_IN_OUT
    - Backup automático e limpeza de dados antigos
@@ -134,23 +201,43 @@ Os QR Codes contêm informações no formato: **`CPF|NOME`**
 
 ### 1. Inicialização
 ```bash
+# Terminal local (modo standalone)
 python pobchecker_terminal.py
+
+# Servidor central (modo consolidador)
+python run_server.py
 ```
 
-### 2. Geração de QR Codes
+### 2. Configuração de Rede (Opcional)
+```bash
+# Arquivo: terminal_config.json
+{
+  "terminal_id": "terminal-01",
+  "location": "Plataforma A",
+  "sync_interval_seconds": 30,
+  "network": {
+    "enabled": true,
+    "api_key": "sua-chave-api"
+  }
+}
+```
+
+### 3. Geração de QR Codes
 - Execute `python helper/helper_generate_qrcodes.py` para gerar QR Codes
 - Os códigos são salvos na pasta `qrcodes_cpf/`
 - Formato: CPF|Nome para melhor identificação
 
-### 3. Controle de Presença
+### 4. Controle de Presença
 - **Modo CIO**: Controle de embarque/desembarque
 - **Modo CEV**: Verificação de presença em eventos
 - Use a câmera para ler QR Codes ou pesquise manualmente
 
-### 4. Relatórios
+### 5. Relatórios
 - Visualização em tempo real do POB
 - Estatísticas de presença por grupo
 - Histórico de eventos
+- Dashboard web (modo servidor)
+- Relatórios consolidados multi-terminal
 
 ## 🔧 Manual Operacional
 
@@ -279,6 +366,7 @@ MicroSD 32GB Classe 10
 Câmera Pi ou USB
 Display 7" Touch (opcional)
 Case protetor para ambiente industrial
+Switch de rede (para múltiplos terminais)
 ```
 
 ### Configuração Otimizada
@@ -328,6 +416,21 @@ tests/                 # Testes do sistema
 - Controle de grupos independentes
 - Feedback visual e sonoro
 - Limpeza automática de registros antigos
+- Sincronização automática com servidor (quando disponível)
+
+#### **Servidor Central (pobchecker_server.py)**
+- API REST completa para consolidação
+- Interface web para monitoramento
+- Descoberta automática de terminais via mDNS
+- Suporte a PostgreSQL e SQLite
+- Relatórios consolidados
+- Dashboard em tempo real
+
+#### **Serviços de Rede**
+- **Sincronização** (`sync_service.py`): Dados automáticos entre terminais
+- **Descoberta** (`network_discovery.py`): Detecção automática de serviços
+- **Temporal** (`time_sync.py`): Sincronização NTP não-bloqueante
+- **PostgreSQL** (`database_postgres.py`): Suporte a banco enterprise
 
 #### **Banco de Dados (database.py)**
 - SQLite com 4 tabelas principais:
@@ -498,4 +601,142 @@ Desenvolvido por **Ygor Pitombeira**
 ---
 
 **Última Atualização**: Julho 2025  
-**Versão**: 2.0 - Sistema Reorganizado com Modos CIO/CEV
+**Versão**: 2.0 - Sistema Reorganizado com Modos CIO/CEV e Funcionalidades de Rede  
+
+## 🌐 Funcionalidades de Rede (Nova Versão)
+
+### Arquitetura Distribuída
+O POBChecker agora suporta operação em rede com:
+- **Terminais Locais**: Interfaces operacionais distribuídas
+- **Servidor Central**: Consolidação de dados de múltiplos terminais
+- **Sincronização Automática**: Dados sincronizados em tempo real
+- **Operação Offline**: Funciona mesmo sem conectividade
+
+### Componentes de Rede
+
+#### **Servidor Central** (`pobchecker_server.py`)
+- API REST completa para consolidação
+- Interface web para monitoramento
+- Suporte a PostgreSQL para alta disponibilidade
+- Descoberta automática de terminais via mDNS
+- Dashboard em tempo real
+
+#### **Sincronização** (`sync_service.py`)
+- Sincronização automática de dados não enviados
+- Retry automático em caso de falha de rede
+- Configuração por arquivo JSON
+- Operação em background não-bloqueante
+
+#### **Descoberta de Rede** (`network_discovery.py`)
+- Detecção automática de serviços via mDNS
+- Fallback para IPs conhecidos
+- Scan automático de rede local
+- Configuração flexível de descoberta
+
+#### **Sincronização Temporal** (`time_sync.py`)
+- Sincronização com servidores NTP
+- Múltiplos servidores de backup
+- Funcionamento offline garantido
+- Configuração por arquivo JSON
+
+### Configuração de Rede
+
+#### **Terminal Config** (`terminal_config.json`)
+```json
+{
+  "terminal_id": "terminal-01",
+  "location": "Plataforma A - Ponte",
+  "sync_interval_seconds": 30,
+  "network": {
+    "enabled": true,
+    "api_key": "sua-chave-segura-aqui",
+    "discovery_timeout": 10
+  },
+  "time_sync": {
+    "enabled": true,
+    "primary_ntp_server": "pool.ntp.br",
+    "sync_interval_seconds": 3600
+  }
+}
+```
+
+#### **Consolidator Config** (`consolidator_config.json`)
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "api_key": "chave-servidor-central"
+  },
+  "database": {
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "name": "pobchecker",
+    "user": "postgres",
+    "password": "senha"
+  },
+  "mdns": {
+    "enabled": true,
+    "service_name": "pobchecker-server"
+  }
+}
+```
+
+### Instalação com Funcionalidades de Rede
+
+```bash
+# Instalar dependências básicas
+pip install -r requirements.txt
+
+# Instalar dependências de rede
+pip install -r requirements_network.txt
+
+# Configurar PostgreSQL (opcional)
+# Editar consolidator_config.json
+
+# Iniciar servidor central
+python run_server.py
+
+# Iniciar terminal com sincronização
+python pobchecker_terminal.py
+```
+
+### Modo de Operação
+
+#### **Funcionamento Híbrido**
+- **Sem Rede**: Operação completamente local
+- **Com Rede**: Sincronização automática transparente
+- **Falha de Rede**: Continua funcionando, ressincroniza quando retorna
+
+#### **Descoberta Automática**
+- Terminais detectam servidor automaticamente
+- Configuração mínima necessária
+- Fallback para IPs conhecidos
+
+#### **Segurança**
+- Autenticação via API Key
+- Comunicação HTTP com headers de segurança
+- Validação de dados em todas as operações
+
+### Relatórios Consolidados
+
+#### **Dashboard Web**
+- Acesso via `http://servidor:8000/dashboard`
+- Visualização em tempo real de todos os terminais
+- Estatísticas consolidadas
+- Histórico de eventos
+
+#### **API REST**
+- Endpoints para integração externa
+- Dados em formato JSON
+- Filtros por terminal, data, evento
+- Documentação automática via FastAPI
+
+### Benefícios da Versão em Rede
+
+1. **Visibilidade Centralizada**: Todos os dados em um local
+2. **Redundância**: Backup automático entre terminais
+3. **Relatórios Unificados**: Dados de toda a plataforma
+4. **Escalabilidade**: Suporta múltiplos terminais
+5. **Confiabilidade**: Funciona mesmo offline
