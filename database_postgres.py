@@ -19,7 +19,6 @@ class POB(Base):
     
     CPF = Column(String(11), primary_key=True)
     Name = Column(String(255), nullable=False)
-    GroupNumber = Column(Integer, nullable=False)
     Onshore = Column(Integer, default=1)
     Synced = Column(Integer, default=0)
     
@@ -91,7 +90,6 @@ class DatabasePostgres:
             person = POB(
                 CPF=person_data['cpf'],
                 Name=person_data['nome'],
-                GroupNumber=person_data['grupo'],
                 Onshore=person_data['Onshore']
             )
             self.session.add(person)
@@ -187,7 +185,7 @@ class DatabasePostgres:
         """
         try:
             persons = self.session.query(POB).all()
-            return [{'cpf': p.CPF, 'nome': p.Name, 'grupo': p.GroupNumber, 'Onshore': p.Onshore} for p in persons]
+            return [{'cpf': p.CPF, 'nome': p.Name, 'Onshore': p.Onshore} for p in persons]
         except Exception as e:
             print(f"Erro ao obter pessoas: {e}")
             return []
@@ -199,7 +197,7 @@ class DatabasePostgres:
         try:
             person = self.session.query(POB).filter_by(CPF=cpf).first()
             if person:
-                return {'cpf': person.CPF, 'nome': person.Name, 'grupo': person.GroupNumber, 'Onshore': person.Onshore}
+                return {'cpf': person.CPF, 'nome': person.Name, 'Onshore': person.Onshore}
             return None
         except Exception as e:
             print(f"Erro ao buscar pessoa: {e}")
@@ -229,7 +227,6 @@ class DatabasePostgres:
             person = self.session.query(POB).filter_by(CPF=cpf).first()
             if person:
                 person.Name = new_data.get('nome', person.Name)
-                person.GroupNumber = new_data.get('grupo', person.GroupNumber)
                 person.Onshore = new_data.get('Onshore', person.Onshore)
                 self.session.commit()
                 return True
@@ -246,7 +243,7 @@ class DatabasePostgres:
         try:
             if table_name == 'pob':
                 records = self.session.query(POB).filter_by(Synced=0).all()
-                return [{'cpf': r.CPF, 'nome': r.Name, 'grupo': r.GroupNumber, 'Onshore': r.Onshore} for r in records]
+                return [{'cpf': r.CPF, 'nome': r.Name, 'Onshore': r.Onshore} for r in records]
             elif table_name == 'check_event':
                 records = self.session.query(CheckEvent).filter_by(Synced=0).all()
                 return [{'id': r.ID, 'cpf': r.CPF, 'nome': r.Name, 'timestamp': r.Timestamp, 'event': r.Event} for r in records]
@@ -349,15 +346,14 @@ def migrate_from_sqlite(sqlite_file="pobchecker.sqlite3"):
         print("Iniciando migração do SQLite para PostgreSQL...")
         
         # Migra POB
-        sqlite_cursor.execute("SELECT CPF, Name, GroupNumber, Onshore FROM POB")
+        sqlite_cursor.execute("SELECT CPF, Name, Onshore FROM POB")
         pob_data = sqlite_cursor.fetchall()
         
         for row in pob_data:
             person_data = {
                 'cpf': row[0],
                 'nome': row[1],
-                'grupo': row[2],
-                'Onshore': row[3]
+                'Onshore': row[2]
             }
             pg_db.insert_person(person_data)
         
@@ -433,7 +429,6 @@ if __name__ == "__main__":
         test_person = {
             'cpf': '12345678901',
             'nome': 'Teste PostgreSQL',
-            'grupo': 1,
             'Onshore': 1
         }
         

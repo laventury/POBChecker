@@ -64,20 +64,18 @@ def populate_database():
             
             # Gera dados da pessoa
             nome = fake.name()
-            grupo = random.randint(1, 5)  # Grupos de 1 a 5
             onshore = random.choice([0, 1])  # 0 = Offshore, 1 = Onshore
             
             person_data = {
                 'cpf': cpf,
                 'nome': nome,
-                'grupo': grupo,
                 'Onshore': onshore
             }
             
             # Insere no banco
             success = db.insert_person(person_data)
             if success:
-                print(f"✓ {i+1:2d}. {nome} (CPF: {cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}) - Grupo {grupo}")
+                print(f"✓ {i+1:2d}. {nome} (CPF: {cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]})")
             else:
                 print(f"✗ Erro ao inserir: {nome}")
         

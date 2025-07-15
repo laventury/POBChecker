@@ -52,7 +52,6 @@ class AttendanceChecker:
 
         # --- INICIALIZAÇÃO DE VARIÁVEIS E BANCO DE DADOS ---
         self.db = Database()
-        self.current_group = 1
         self.person_widgets = {} 
         
         # Modos de operação
@@ -152,19 +151,6 @@ class AttendanceChecker:
             font=ctk.CTkFont(size=9)
         )
         self.search_button.pack(side="top", padx=3, pady=(0, 3))
-
-        # Controles de seleçao de grupo
-
-        self.group_selector_frame = ctk.CTkFrame(self.left_frame)
-        self.group_selector_frame.pack(side="top", fill="x", padx=5, pady=5)
-        
-        self.group_selector = ctk.CTkSegmentedButton(
-            self.group_selector_frame, 
-            values=["Grupo 1", "Grupo 2"], 
-            command=self.change_group
-        )
-        self.group_selector.set("Grupo 1")
-        self.group_selector.pack(side="top", padx=5, pady=(5, 0), fill="x")
 
         # Frame Direito - Lista e Estatísticas
         self.right_frame = ctk.CTkFrame(self.root)
@@ -271,7 +257,7 @@ class AttendanceChecker:
                 play_error_sound()
         else:
             # Pessoa não está no POB, adiciona (Check In)
-            if nome_qr and self.db.add_person_to_pob(cpf, nome_qr, self.current_group):
+            if nome_qr and self.db.add_person_to_pob(cpf, nome_qr):
                 self.update_status_bar(f"CHECK IN: {nome_display} entrou na plataforma.", "green")
                 play_success_sound()
                 self.update_person_list()
@@ -293,7 +279,7 @@ class AttendanceChecker:
             play_error_sound()
             return
         
-        cpf_db, nome_db, grupo = person_data
+        cpf_db, nome_db = person_data
         nome_display = nome_qr if nome_qr else nome_db
         
         # Verifica se a pessoa já está checada no evento
@@ -334,7 +320,7 @@ class AttendanceChecker:
         
         if len(results) == 1:
             person_data = results[0]
-            cpf, nome, grupo = person_data
+            cpf, nome = person_data
             # Simula processamento de QR Code
             qr_data = f"{cpf}|{nome}"
             self.handle_cio_mode(cpf, nome)
@@ -355,7 +341,7 @@ class AttendanceChecker:
 
         if len(results) == 1:
             person_data = results[0]
-            cpf, nome, grupo = person_data
+            cpf, nome = person_data
             self.handle_cev_mode(cpf, nome)
             self.search_entry.delete(0, 'end')
         elif len(results) > 1:
@@ -363,13 +349,6 @@ class AttendanceChecker:
             self.update_status_bar(f"Múltiplos resultados: {', '.join(names[:3])}{'...' if len(names) > 3 else ''}", "orange")
         else:
             self.update_status_bar("Nenhuma pessoa encontrada com este nome ou CPF.", "red")
-
-    def change_group(self, value):
-        """Chamado quando o seletor de grupo é alterado."""
-        group_number_str = value.replace("Grupo ", "")
-        self.current_group = int(group_number_str)
-        self.update_person_list()
-        self.update_status_bar(f"Exibindo Grupo {self.current_group}", "white")
 
     def update_person_list(self):
         """Atualiza a lista de pessoas baseada no modo atual."""
@@ -395,14 +374,14 @@ class AttendanceChecker:
         
         self.person_widgets.clear()
 
-        # Busca pessoas no POB do grupo atual
-        people = self.db.get_people_by_group(self.current_group)
+        # Busca pessoas no POB
+        people = self.db.get_all_people()
         # Filtra apenas pessoas que estão realmente no POB (Onshore = 0)
         people_in_pob = [p for p in people if self.db.is_person_in_pob(p[0])]
 
         if hasattr(self, 'scrollable_frame') and self.scrollable_frame.winfo_exists():
             for person in people_in_pob:
-                cpf, nome, _ = person
+                cpf, nome = person
                 
                 row_frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
                 row_frame.pack(fill="x", pady=2, padx=2)
@@ -438,15 +417,15 @@ class AttendanceChecker:
             self._update_cev_stats(0, 0)
             return
 
-        # Busca pessoas do grupo atual
-        people = self.db.get_people_by_group(self.current_group)
+        # Busca todas as pessoas cadastradas
+        people = self.db.get_all_people()
         checked_cpfs = self.db.get_checks_in_event(self.active_event_id)
 
         checked_people = []
         unchecked_people = []
 
         for person in people:
-            cpf, nome, _ = person
+            cpf, nome = person
             if cpf in checked_cpfs:
                 checked_people.append(person)
             else:
@@ -455,7 +434,7 @@ class AttendanceChecker:
         # Preenche lista de não checados
         if hasattr(self, 'unchecked_frame') and self.unchecked_frame.winfo_exists():
             for person in unchecked_people:
-                cpf, nome, _ = person
+                cpf, nome = person
                 
                 row_frame = ctk.CTkFrame(self.unchecked_frame, fg_color="#FFF2F2")  # Fundo vermelho claro
                 row_frame.pack(fill="x", pady=2, padx=2)
@@ -471,7 +450,7 @@ class AttendanceChecker:
         # Preenche lista de checados
         if hasattr(self, 'checked_frame') and self.checked_frame.winfo_exists():
             for person in checked_people:
-                cpf, nome, _ = person
+                cpf, nome = person
                 
                 row_frame = ctk.CTkFrame(self.checked_frame, fg_color="#F0F8F0")  # Fundo verde claro
                 row_frame.pack(fill="x", pady=2, padx=2)

@@ -29,13 +29,9 @@ class Database:
             CREATE TABLE IF NOT EXISTS POB (
                 CPF TEXT PRIMARY KEY,
                 Name TEXT NOT NULL,
-                GroupNumber INTEGER NOT NULL,
                 Onshore INTEGER DEFAULT 1
             )
         ''')
-        
-        # Migra a coluna Group para GroupNumber se necessário
-        self._migrate_group_column()
         
         # Adiciona colunas Synced se necessário
         self._add_synced_columns()
@@ -85,12 +81,11 @@ class Database:
         """
         try:
             self.cursor.execute('''
-                INSERT INTO POB (CPF, Name, GroupNumber, Onshore)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO POB (CPF, Name, Onshore)
+                VALUES (?, ?, ?)
             ''', (
                 person_data['cpf'],
                 person_data['nome'],
-                person_data['grupo'],
                 person_data['Onshore']
             ))
             self.conn.commit()
@@ -114,11 +109,11 @@ class Database:
         return False
             
 
-    def get_people_by_group(self, group_number):
+    def get_all_people(self):
         """
-        Retorna uma lista de todas as pessoas de um determinado grupo.
+        Retorna uma lista de todas as pessoas cadastradas.
         """
-        self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE GroupNumber = ? ORDER BY Name", (group_number,))
+        self.cursor.execute("SELECT CPF, Name FROM POB ORDER BY Name")
         return self.cursor.fetchall()
 
     def clean_cpf(self, cpf):
@@ -139,7 +134,7 @@ class Database:
         if not self.validate_cpf(cpf_clean):
             return None
             
-        self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE CPF = ?", (cpf_clean,))
+        self.cursor.execute("SELECT CPF, Name FROM POB WHERE CPF = ?", (cpf_clean,))
         return self.cursor.fetchone()
 
     def find_people_by_search(self, search_term):
@@ -151,20 +146,20 @@ class Database:
         # Se o termo de busca parece ser um CPF, limpa ele para busca
         if search_term.replace(".", "").replace("-", "").replace(" ", "").isdigit():
             cpf_clean = self.clean_cpf(search_term)
-            self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE Name LIKE ? OR CPF LIKE ?", (query, cpf_clean))
+            self.cursor.execute("SELECT CPF, Name FROM POB WHERE Name LIKE ? OR CPF LIKE ?", (query, cpf_clean))
         else:
-            self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE Name LIKE ?", (query,))
+            self.cursor.execute("SELECT CPF, Name FROM POB WHERE Name LIKE ?", (query,))
         return self.cursor.fetchall()
 
-    def add_person_to_pob(self, cpf, nome, grupo=1):
+    def add_person_to_pob(self, cpf, nome):
         """
         Adiciona uma pessoa à tabela POB (People On Board) e registra check-in.
         """
         try:
             self.cursor.execute('''
-                INSERT OR REPLACE INTO POB (CPF, Name, GroupNumber, Onshore)
-                VALUES (?, ?, ?, 0)
-            ''', (cpf, nome, grupo))
+                INSERT OR REPLACE INTO POB (CPF, Name, Onshore)
+                VALUES (?, ?, 0)
+            ''', (cpf, nome))
             
             # Registra o check-in
             self.record_check_in_out(cpf, nome, "IN")
@@ -360,11 +355,10 @@ class Database:
         try:
             self.cursor.execute('''
                 UPDATE POB 
-                SET Name = ?, GroupNumber = ?
+                SET Name = ?
                 WHERE CPF = ?
             ''', (
                 person_data['nome'],
-                person_data['grupo'],
                 cpf
             ))
             self.conn.commit()
@@ -403,55 +397,8 @@ class Database:
         Retorna todos os detalhes de uma pessoa pelo CPF.
         """
         cpf_clean = self.clean_cpf(cpf)
-        self.cursor.execute("SELECT CPF, Name, GroupNumber FROM POB WHERE CPF = ?", (cpf_clean,))
+        self.cursor.execute("SELECT CPF, Name FROM POB WHERE CPF = ?", (cpf_clean,))
         return self.cursor.fetchone()
-
-    def _migrate_group_column(self):
-        """
-        Migra a coluna 'Group' para 'GroupNumber' se a tabela já existir com a estrutura antiga.
-        """
-        try:
-            # Verifica se a coluna 'Group' existe
-            self.cursor.execute("PRAGMA table_info(POB)")
-            columns = [column[1] for column in self.cursor.fetchall()]
-            
-            if 'Group' in columns and 'GroupNumber' not in columns:
-                # Precisa migrar: renomear Group para GroupNumber
-                # SQLite não suporta ALTER COLUMN, então precisamos recriar a tabela
-                
-                # 1. Criar tabela temporária com nova estrutura
-                self.cursor.execute('''
-                    CREATE TABLE POB_temp (
-                        CPF TEXT PRIMARY KEY,
-                        Name TEXT NOT NULL,
-                        GroupNumber INTEGER NOT NULL,
-                        Onshore INTEGER DEFAULT 1
-                    )
-                ''')
-                
-                # 2. Copiar dados da tabela original
-                self.cursor.execute('''
-                    INSERT INTO POB_temp (CPF, Name, GroupNumber, Onshore)
-                    SELECT CPF, Name, [Group], Onshore FROM POB
-                ''')
-                
-                # 3. Remover tabela original
-                self.cursor.execute('DROP TABLE POB')
-                
-                # 4. Renomear tabela temporária
-                self.cursor.execute('ALTER TABLE POB_temp RENAME TO POB')
-                
-                self.conn.commit()
-                print("Migração concluída: coluna 'Group' renomeada para 'GroupNumber'")
-                
-        except Exception as e:
-            print(f"Erro durante migração da coluna Group: {e}")
-            # Em caso de erro, tenta reverter se possível
-            try:
-                self.cursor.execute('DROP TABLE IF EXISTS POB_temp')
-                self.conn.commit()
-            except:
-                pass
 
     def _add_synced_columns(self):
         """
