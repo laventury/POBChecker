@@ -383,6 +383,26 @@ class ConsolidatorDatabase:
             
             return events
 
+    def clear_all_data(self):
+        """Limpa todos os dados do consolidador"""
+        with self._lock:
+            try:
+                # Limpa dados consolidados
+                self.cursor.execute("DELETE FROM check_event_consolidated")
+                self.cursor.execute("DELETE FROM check_in_out_consolidated")
+                self.cursor.execute("DELETE FROM terminal_status")
+                
+                # Reset dos IDs auto-incremento para SQLite
+                if self.db_type == 'sqlite':
+                    self.cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('check_event_consolidated', 'check_in_out_consolidated', 'terminal_status')")
+                
+                self.conn.commit()
+                print("✅ Dados do consolidador limpos com sucesso!")
+                
+            except Exception as e:
+                print(f"❌ Erro ao limpar dados do consolidador: {e}")
+                raise
+
 
 class ConsolidatorServer:
     """Servidor consolidador principal"""
