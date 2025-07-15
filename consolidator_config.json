@@ -1,0 +1,51 @@
+{
+  "consolidator_config": {
+    "server": {
+      "host": "0.0.0.0",
+      "port": 8000,
+      "debug": false
+    },
+    "correlation": {
+      "tolerance_minutes": 30,
+      "auto_correlate": true
+    },
+    "interface": {
+      "theme": "light",
+      "auto_refresh_seconds": 20,
+      "pagination_size": 50,
+      "date_format": "dd/mm/yyyy",
+      "timezone": "America/Sao_Paulo"
+    },
+    "database": {
+      "type": "postgresql",
+      "sqlite_file": "pobchecker.sqlite3",
+      "postgresql": {
+        "host": "localhost",
+        "port": 5432,
+        "name": "pobchecker_db",
+        "user": "pobchecker",
+        "password": "pobchecker"
+      }
+    },
+    "network": {
+      "mdns_service_name": "_pobchecker._tcp.local.",
+      "api_key": "consolidador-api-key-2025"
+    },
+    "time_sync": {
+      "enabled": true,
+      "primary_ntp_server": "pool.ntp.org",
+      "backup_ntp_servers": [
+        "time.google.com",
+        "time.cloudflare.com",
+        "time.nist.gov",
+        "pool.ntp.br"
+      ],
+      "sync_interval_seconds": 3600,
+      "timeout_seconds": 5,
+      "max_offset_tolerance": 300,
+      "fallback_to_local": true,
+      "retry_failed_servers": true,
+      "max_retry_attempts": 3
+    }
+  }
+}

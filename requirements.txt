@@ -5,6 +5,10 @@ Pillow
 Faker
 qrcode
 
+# Dependências opcionais para funcionalidades de rede
+# Para instalar: pip install -r requirements_network.txt
+# Se não instaladas, sistema funcionará apenas localmente
+
 # Dependências específicas do sistema para reprodução de som
 # Linux: Para usar paplay (PulseAudio) - geralmente já instalado
 # sudo apt-get install pulseaudio-utils alsa-utils

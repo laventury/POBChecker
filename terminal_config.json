@@ -1,0 +1,31 @@
+{
+  "terminal_config": {
+    "terminal_id": "terminal-plataforma-01",
+    "location": "Sala de Controle",
+    "sync_interval_seconds": 20,
+    "timezone": "America/Sao_Paulo",
+    "network": {
+      "api_key": "consolidador-api-key-2025"
+    },
+    "database": {
+      "type": "sqlite",
+      "sqlite_file": "pobchecker.sqlite3"
+    },
+    "time_sync": {
+      "enabled": true,
+      "primary_ntp_server": "pool.ntp.org",
+      "backup_ntp_servers": [
+        "time.google.com",
+        "time.cloudflare.com",
+        "time.nist.gov",
+        "pool.ntp.br"
+      ],
+      "sync_interval_seconds": 3600,
+      "timeout_seconds": 5,
+      "max_offset_tolerance": 300,
+      "fallback_to_local": true,
+      "retry_failed_servers": true,
+      "max_retry_attempts": 3
+    }
+  }
+}

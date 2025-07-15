@@ -165,4 +165,3 @@ def run_basic_tests():
 
 
 if __name__ == "__main__":
-    main()

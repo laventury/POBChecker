@@ -9,6 +9,16 @@ from audio_manager import play_beep_sound, play_success_sound, play_error_sound
 from camera_manager import CameraManager
 from config import QR_EVENT_CODE, DEFAULT_MODE
 
+# Importações para funcionalidades de rede
+try:
+    from sync_service import SyncService
+    from time_sync import TimeSync
+    NETWORK_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Funcionalidades de rede não disponíveis: {e}")
+    print("   Sistema funcionará apenas localmente")
+    NETWORK_AVAILABLE = False
+
 # Define um tema de cores para a aplicação
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -48,6 +58,20 @@ class AttendanceChecker:
         # Modos de operação
         self.current_mode = DEFAULT_MODE  # "CIO" ou "CEV"
         self.active_event_id = None
+        
+        # Serviços de rede (se disponíveis)
+        self.sync_service = None
+        self.time_sync = None
+        self.network_available = NETWORK_AVAILABLE
+        if self.network_available:
+            try:
+                self.sync_service = SyncService()
+                self.time_sync = TimeSync("terminal_config.json")
+                print("✅ Serviços de rede inicializados")
+            except Exception as e:
+                print(f"⚠️ Erro ao inicializar serviços de rede: {e}")
+                print("   Sistema funcionará apenas localmente")
+                self.network_available = False
         
         # Executa limpeza automática
         self.db.clean_old_records()
@@ -161,7 +185,11 @@ class AttendanceChecker:
         # Inicia o gerenciador de câmera após um pequeno delay
         self.after(500, self.init_camera_manager)
         
+        # Configura protocolo de fechamento
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Inicia serviços de rede após interface estar pronta
+        self.after(1000, self.start_network_services)  # Aguarda 1 segundo
 
     def init_camera_manager(self):
         """Initializa o gerenciador de câmera."""
@@ -486,6 +514,14 @@ class AttendanceChecker:
         """Função chamada ao fechar a janela para liberar recursos."""
         print("Fechando aplicação...")
         
+        # Para serviços de rede
+        if self.network_available and self.sync_service:
+            try:
+                self.sync_service.stop_sync_service()
+                print("✅ Serviços de rede parados")
+            except Exception as e:
+                print(f"⚠️ Erro ao parar serviços de rede: {e}")
+        
         # Para o gerenciador de câmera
         if self.camera_manager:
             self.camera_manager.stop_camera()
@@ -622,6 +658,20 @@ class AttendanceChecker:
         self.checked_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=5)
         self.checked_frame.grid_columnconfigure(0, weight=1)
         self.checked_frame._is_list_container = True
+
+    def start_network_services(self):
+        """Inicia serviços de rede após interface estar pronta"""
+        if self.network_available and self.sync_service:
+            try:
+                self.sync_service.start_sync_service()
+                print("✅ Serviços de rede iniciados")
+                self.update_status_bar("Serviços de rede iniciados", "green")
+            except Exception as e:
+                print(f"⚠️ Erro ao iniciar serviços de rede: {e}")
+                self.update_status_bar("Erro nos serviços de rede", "red")
+        else:
+            print("ℹ️ Funcionando apenas localmente")
+            self.update_status_bar("Modo local - Sem sincronização", "yellow")
 
 if __name__ == "__main__":
     import sys

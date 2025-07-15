@@ -1,6 +1,7 @@
 # Arquivo: database.py
 
 import sqlite3
+import threading
 from datetime import datetime, timedelta
 
 
@@ -13,7 +14,9 @@ class Database:
         """
         Inicializa a conexão com o banco de dados e cria as tabelas se não existirem.
         """
-        self.conn = sqlite3.connect(db_file)
+        self.db_file = db_file
+        self._lock = threading.Lock()
+        self.conn = sqlite3.connect(db_file, check_same_thread=False)
         self.cursor = self.conn.cursor()
         self.create_tables()
 
@@ -33,6 +36,9 @@ class Database:
         
         # Migra a coluna Group para GroupNumber se necessário
         self._migrate_group_column()
+        
+        # Adiciona colunas Synced se necessário
+        self._add_synced_columns()
 
         # Tabela de registro de eventos (sem campo nome, com Open e Close)
         self.cursor.execute('''
@@ -52,6 +58,7 @@ class Database:
                 Name TEXT,
                 Timestamp TEXT NOT NULL,
                 Event INTEGER,
+                Synced INTEGER DEFAULT 0,
                 FOREIGN KEY (CPF) REFERENCES POB (CPF),
                 FOREIGN KEY (Event) REFERENCES EVENTS (ID)       
             )
@@ -65,6 +72,7 @@ class Database:
                 Name TEXT,
                 Type TEXT NOT NULL,
                 Timestamp TEXT NOT NULL,
+                Synced INTEGER DEFAULT 0,
                 FOREIGN KEY (CPF) REFERENCES POB (CPF)     
             )
         ''')
@@ -444,6 +452,91 @@ class Database:
                 self.conn.commit()
             except:
                 pass
+
+    def _add_synced_columns(self):
+        """
+        Adiciona colunas Synced nas tabelas CHECK_EVENT e CHECK_IN_OUT se não existirem.
+        """
+        try:
+            # Verifica se a coluna Synced já existe na tabela CHECK_EVENT
+            self.cursor.execute("PRAGMA table_info(CHECK_EVENT)")
+            columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'Synced' not in columns:
+                self.cursor.execute("ALTER TABLE CHECK_EVENT ADD COLUMN Synced INTEGER DEFAULT 0")
+                print("Coluna Synced adicionada à tabela CHECK_EVENT")
+            
+            # Verifica se a coluna Synced já existe na tabela CHECK_IN_OUT
+            self.cursor.execute("PRAGMA table_info(CHECK_IN_OUT)")
+            columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'Synced' not in columns:
+                self.cursor.execute("ALTER TABLE CHECK_IN_OUT ADD COLUMN Synced INTEGER DEFAULT 0")
+                print("Coluna Synced adicionada à tabela CHECK_IN_OUT")
+                
+            self.conn.commit()
+        except Exception as e:
+            print(f"Erro ao adicionar colunas Synced: {e}")
+
+    def get_unsynced_event_records(self):
+        """
+        Retorna registros de eventos não sincronizados.
+        """
+        with self._lock:
+            try:
+                self.cursor.execute('''
+                    SELECT ID, CPF, Name, Timestamp, Event 
+                    FROM CHECK_EVENT 
+                    WHERE Synced = 0
+                ''')
+                return self.cursor.fetchall()
+            except Exception as e:
+                print(f"Erro ao buscar registros de eventos não sincronizados: {e}")
+                return []
+
+    def get_unsynced_checkinout_records(self):
+        """
+        Retorna registros de check in/out não sincronizados.
+        """
+        with self._lock:
+            try:
+                self.cursor.execute('''
+                    SELECT ID, CPF, Name, Type, Timestamp 
+                    FROM CHECK_IN_OUT 
+                    WHERE Synced = 0
+                ''')
+                return self.cursor.fetchall()
+            except Exception as e:
+                print(f"Erro ao buscar registros de check in/out não sincronizados: {e}")
+                return []
+
+    def mark_records_as_synced(self, event_ids=None, checkinout_ids=None):
+        """
+        Marca registros como sincronizados.
+        """
+        with self._lock:
+            try:
+                if event_ids:
+                    placeholders = ','.join(['?' for _ in event_ids])
+                    self.cursor.execute(f'''
+                        UPDATE CHECK_EVENT 
+                        SET Synced = 1 
+                        WHERE ID IN ({placeholders})
+                    ''', event_ids)
+                
+                if checkinout_ids:
+                    placeholders = ','.join(['?' for _ in checkinout_ids])
+                    self.cursor.execute(f'''
+                        UPDATE CHECK_IN_OUT 
+                        SET Synced = 1 
+                        WHERE ID IN ({placeholders})
+                    ''', checkinout_ids)
+                    
+                self.conn.commit()
+                return True
+            except Exception as e:
+                print(f"Erro ao marcar registros como sincronizados: {e}")
+                return False
 
     def __del__(self):
         """
