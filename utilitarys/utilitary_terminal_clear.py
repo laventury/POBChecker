@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Arquivo: helper_clear_data.py
-Descrição: Script auxiliar para limpeza interativa de dados do banco
-Antigo nome: aux_clear_data.py (renomeado de aux para helper)
+Arquivo: utilitary_terminal_clear.py
+Descrição: Script utilitário para limpeza de dados dos terminais
 """
 
 import sys
@@ -17,13 +16,14 @@ from database import Database
 def show_menu():
     """Mostra o menu de opções"""
     print("\n" + "=" * 50)
-    print("POBCHECKER - LIMPEZA DE DADOS")
+    print("POBCHECKER - LIMPEZA DE DADOS DOS TERMINAIS")
     print("=" * 50)
     print("1. Limpar TODOS os dados (POB + Eventos + Pessoas)")
     print("2. Limpar apenas registros de presença (POB)")
     print("3. Limpar apenas eventos")
-    print("4. Mostrar estatísticas do banco")
-    print("5. Sair")
+    print("4. Limpar dados do consolidador")
+    print("5. Mostrar estatísticas do banco")
+    print("6. Sair")
     print("=" * 50)
 
 def show_stats(db):
@@ -128,6 +128,39 @@ def clear_events_only(db):
     except Exception as e:
         print(f"❌ Erro ao limpar eventos: {e}")
 
+def clear_consolidator_data():
+    """Limpa dados do consolidador"""
+    print("🗑️  Limpando dados do consolidador...")
+    
+    try:
+        # Tenta importar e limpar dados do consolidador
+        from pobchecker_server import ConsolidatorServer
+        
+        print("⚠️  Esta operação irá limpar todos os dados do consolidador.")
+        print("   • Eventos consolidados")
+        print("   • Status dos terminais")
+        print("   • Correlações")
+        print("   • Logs de sincronização")
+        
+        confirm = input("\nDeseja continuar? (digite 'SIM'): ")
+        if confirm.upper() != 'SIM':
+            print("❌ Operação cancelada.")
+            return
+        
+        server = ConsolidatorServer()
+        
+        # Limpa dados do consolidador
+        if hasattr(server.db, 'clear_all_data'):
+            server.db.clear_all_data()
+            print("✅ Dados do consolidador limpos!")
+        else:
+            print("⚠️  Método de limpeza não disponível no consolidador")
+            
+    except ImportError:
+        print("⚠️  Consolidador não disponível (pobchecker_server não encontrado)")
+    except Exception as e:
+        print(f"❌ Erro ao limpar dados do consolidador: {e}")
+
 def main():
     """Função principal"""
     print("🚀 POBCHECKER - LIMPEZA DE DADOS v2.0")
@@ -168,9 +201,12 @@ def main():
                     print("❌ Operação cancelada")
                     
             elif choice == "4":
-                show_stats(db)
+                clear_consolidator_data()
                 
             elif choice == "5":
+                show_stats(db)
+                
+            elif choice == "6":
                 print("👋 Saindo...")
                 break
                 

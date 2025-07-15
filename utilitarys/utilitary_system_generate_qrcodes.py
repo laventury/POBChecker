@@ -1,4 +1,4 @@
-# Arquivo: helper_generate_qrcodes.py - Helper para geração de QR Codes
+# Arquivo: utilitary_system_generate_qrcodes.py - Utilitário para geração de QR Codes
 
 import sqlite3
 import qrcode
@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import QR_EVENT_CODE
 
 # --- Configurações ---
-# Obtem o diretório raiz do projeto (diretório pai do helper)
+# Obtem o diretório raiz do projeto (diretório pai do utilitarys)
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATABASE_FILE = os.path.join(ROOT_DIR, "pobchecker.sqlite3")
 OUTPUT_FOLDER = os.path.join(ROOT_DIR, "qrcodes_cpf")

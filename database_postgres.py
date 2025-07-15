@@ -17,10 +17,10 @@ Base = declarative_base()
 class POB(Base):
     __tablename__ = 'pob'
     
-    CPF = Column(String(11), primary_key=True)
-    Name = Column(String(255), nullable=False)
-    Onshore = Column(Integer, default=1)
-    Synced = Column(Integer, default=0)
+    CPF = Column('cpf', String(11), primary_key=True)
+    Name = Column('name', String(255), nullable=False)
+    Onshore = Column('onshore', Integer, default=1)
+    Synced = Column('synced', Integer, default=0)
     
     # Relacionamentos
     check_events = relationship("CheckEvent", back_populates="person")
@@ -29,11 +29,11 @@ class POB(Base):
 class Events(Base):
     __tablename__ = 'events'
     
-    ID = Column(Integer, primary_key=True, autoincrement=True)
-    Open = Column(String(255), nullable=False)
-    Close = Column(String(255), nullable=True)
-    Closed = Column(Integer, default=0)
-    Synced = Column(Integer, default=0)
+    ID = Column('id', Integer, primary_key=True, autoincrement=True)
+    Open = Column('open', String(255), nullable=False)
+    Close = Column('close', String(255), nullable=True)
+    Closed = Column('closed', Integer, default=0)
+    Synced = Column('synced', Integer, default=0)
     
     # Relacionamentos
     check_events = relationship("CheckEvent", back_populates="event")
@@ -41,12 +41,12 @@ class Events(Base):
 class CheckEvent(Base):
     __tablename__ = 'check_event'
     
-    ID = Column(Integer, primary_key=True, autoincrement=True)
-    CPF = Column(String(11), ForeignKey('pob.CPF'))
-    Name = Column(String(255))
-    Timestamp = Column(String(255), nullable=False)
-    Event = Column(Integer, ForeignKey('events.ID'))
-    Synced = Column(Integer, default=0)
+    ID = Column('id', Integer, primary_key=True, autoincrement=True)
+    CPF = Column('cpf', String(11), ForeignKey('pob.cpf'))
+    Name = Column('name', String(255))
+    Timestamp = Column('timestamp', String(255), nullable=False)
+    Event = Column('event', Integer, ForeignKey('events.id'))
+    Synced = Column('synced', Integer, default=0)
     
     # Relacionamentos
     person = relationship("POB", back_populates="check_events")
@@ -55,12 +55,12 @@ class CheckEvent(Base):
 class CheckInOut(Base):
     __tablename__ = 'check_in_out'
     
-    ID = Column(Integer, primary_key=True, autoincrement=True)
-    CPF = Column(String(11), ForeignKey('pob.CPF'))
-    Name = Column(String(255))
-    Type = Column(String(50), nullable=False)
-    Timestamp = Column(String(255), nullable=False)
-    Synced = Column(Integer, default=0)
+    ID = Column('id', Integer, primary_key=True, autoincrement=True)
+    CPF = Column('cpf', String(11), ForeignKey('pob.cpf'))
+    Name = Column('name', String(255))
+    Type = Column('type', String(50), nullable=False)
+    Timestamp = Column('timestamp', String(255), nullable=False)
+    Synced = Column('synced', Integer, default=0)
     
     # Relacionamentos
     person = relationship("POB", back_populates="check_in_outs")
@@ -74,7 +74,15 @@ class DatabasePostgres:
         Inicializa a conexão com PostgreSQL e cria as tabelas se necessário.
         """
         if database_url is None:
-            database_url = os.getenv('DATABASE_URL', 'postgresql://pobchecker:pobchecker@localhost:5432/pobchecker_db')
+            try:
+                # Tenta carregar da configuração
+                with open('consolidator_config.json', 'r') as f:
+                    config = json.load(f)
+                db_config = config['consolidator_config']['database']['postgresql']
+                database_url = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['name']}"
+            except:
+                # Fallback para configuração padrão
+                database_url = os.getenv('DATABASE_URL', 'postgresql://pobchecker:pobchecker@localhost:5432/pobchecker_db')
         
         self.engine = create_engine(database_url)
         Base.metadata.create_all(self.engine)
@@ -321,6 +329,73 @@ class DatabasePostgres:
         except Exception as e:
             print(f"Erro ao obter status da pessoa: {e}")
             return "UNKNOWN"
+
+    def get_stats(self):
+        """
+        Retorna estatísticas do consolidador.
+        """
+        try:
+            # Conta registros
+            total_persons = self.session.query(POB).count()
+            total_events = self.session.query(Events).count()
+            total_checks = self.session.query(CheckEvent).count()
+            total_checkins = self.session.query(CheckInOut).count()
+            
+            # Eventos abertos
+            open_events = self.session.query(Events).filter_by(Closed=0).count()
+            
+            # Pessoas no POB (Onshore = 0)
+            pob_count = self.session.query(POB).filter_by(Onshore=0).count()
+            
+            # Última sincronização (simula por enquanto)
+            last_sync = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            return {
+                'terminals': 1,  # Por enquanto simula 1 terminal
+                'events': total_events,
+                'last_sync': last_sync,
+                'total_persons': total_persons,
+                'total_checks': total_checks,
+                'total_checkins': total_checkins,
+                'open_events': open_events,
+                'pob_count': pob_count
+            }
+        except Exception as e:
+            print(f"Erro ao obter estatísticas: {e}")
+            return {}
+
+    def get_consolidated_events(self):
+        """
+        Retorna eventos consolidados.
+        """
+        try:
+            events = self.session.query(Events).all()
+            return [{'id': e.ID, 'open': e.Open, 'close': e.Close, 'closed': e.Closed} for e in events]
+        except Exception as e:
+            print(f"Erro ao obter eventos consolidados: {e}")
+            return []
+
+    def get_terminal_status(self):
+        """
+        Retorna status dos terminais.
+        """
+        try:
+            # Por enquanto simula um terminal
+            return [{'id': 1, 'name': 'Terminal-001', 'status': 'online', 'last_sync': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]
+        except Exception as e:
+            print(f"Erro ao obter status dos terminais: {e}")
+            return []
+
+    def get_sync_logs(self):
+        """
+        Retorna logs de sincronização.
+        """
+        try:
+            # Por enquanto simula logs
+            return [{'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'action': 'sync', 'status': 'success'}]
+        except Exception as e:
+            print(f"Erro ao obter logs de sincronização: {e}")
+            return []
 
     def close(self):
         """

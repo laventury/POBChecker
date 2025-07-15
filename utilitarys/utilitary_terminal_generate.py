@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Arquivo: helper_pob_generate.py
-Descrição: Script auxiliar para popular o banco de dados com dados de teste usando Faker
-Antigo nome: aux_pob_generate.py (renomeado de aux para helper)
+Arquivo: utilitary_terminal_generate.py
+Descrição: Script utilitário para popular o banco de dados com dados de teste
 """
 
 import sys
