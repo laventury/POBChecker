@@ -170,7 +170,7 @@ terminal_status: terminal_id, location, last_sync, status, sync_count
 ### **8. ELIMINAÇÃO DE MIGRAÇÃO**
 
 #### **8.1 Estratégia de Implementação**
-- **Sem Migração:** Dados atuais podem ser deletados
+- **Sem Migração:** Dados atuais podem ser deletados. inclusive a estrutura atual das tabelas.
 - **Recriação:** Tabelas serão recriadas com nova estrutura
 - **Ambiente:** Sistema está em desenvolvimento, sem dados críticos
 
