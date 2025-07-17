@@ -16,7 +16,7 @@ Implementar sistema de sincronização de dados entre terminais e consolidador c
 ### **1. ANÁLISE PRÉVIA OBRIGATÓRIA**
 - **PRIMEIRA ETAPA:** Agent deve SEMPRE analisar e entender completamente o funcionamento atual do sistema antes de fazer qualquer alteração
 - **MAPEAMENTO:** Identificar todas as funcionalidades existentes, arquivos, configurações e dependências
-- **PRESERVAÇÃO:** Funcionalidades NÃO mencionadas neste documento devem ser mantidas intactas
+- **PRESERVAÇÃO:** Funcionalidades NÃO mencionadas neste documento devem ter suas funcionalidade e para isso devem ser testados após as alterações. Isso inclui e não se limita aos sistemas auxuliares como tests e utilitarys.
 - **COMPATIBILIDADE:** Todas as alterações devem manter compatibilidade com o sistema existente
 
 ### **2. DESCOBERTA AUTOMÁTICA DE REDE - PRESERVAÇÃO OBRIGATÓRIA**
