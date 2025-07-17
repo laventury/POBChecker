@@ -38,7 +38,7 @@ def main():
         print("\n⏹️  Pressione Ctrl+C para parar\n")
         
         # Inicia servidor
-        server.start()
+        server.start_server()
         
     except KeyboardInterrupt:
         print("\n⚠️ Servidor parado pelo usuário")

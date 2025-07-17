@@ -16,7 +16,8 @@ class EventCorrelator:
     
     def correlate_events(self, terminal_events: List[Dict]) -> List[Dict]:
         """
-        Correlaciona eventos de terminais diferentes baseado em janela temporal
+        Correlaciona eventos de terminais diferentes baseado em janela temporal.
+        Considera apenas eventos com participantes com Status = 'ACTIVE'.
         
         Args:
             terminal_events: Lista de eventos de diferentes terminais
@@ -27,11 +28,20 @@ class EventCorrelator:
         if not terminal_events:
             return []
         
+        # Filtra apenas eventos com participantes ativos
+        active_events = []
+        for event in terminal_events:
+            if self._has_active_participants(event):
+                active_events.append(event)
+        
+        if not active_events:
+            return []
+        
         correlated_groups = []
         processed_events = set()
         
         # Ordena eventos por timestamp
-        sorted_events = sorted(terminal_events, key=lambda e: e.get('start_time', ''))
+        sorted_events = sorted(active_events, key=lambda e: e.get('start_time', ''))
         
         for event in sorted_events:
             if event.get('id') in processed_events:
@@ -49,15 +59,23 @@ class EventCorrelator:
                 correlated_groups.append(consolidated)
                 processed_events.update(str(e.get('id', '')) for e in related_events)
         
-        # Registra histórico de correlação
-        self.correlation_history.append({
-            'timestamp': datetime.now().isoformat(),
-            'input_events': len(terminal_events),
-            'correlated_groups': len(correlated_groups),
-            'tolerance_minutes': self.tolerance_minutes
-        })
-        
         return correlated_groups
+    
+    def _has_active_participants(self, event: Dict) -> bool:
+        """
+        Verifica se o evento tem participantes com status ACTIVE
+        """
+        participants = event.get('participants', [])
+        if not participants:
+            return False
+            
+        # Conta apenas participantes com status ACTIVE
+        active_count = 0
+        for participant in participants:
+            if participant.get('status', 'ACTIVE') == 'ACTIVE':
+                active_count += 1
+                
+        return active_count > 0
     
     def _find_related_events(self, base_event: Dict, all_events: List[Dict], processed: Set) -> List[Dict]:
         """
@@ -93,19 +111,40 @@ class EventCorrelator:
         return related
     
     def _create_consolidated_event(self, events: List[Dict]) -> Dict:
-        """Cria evento consolidado a partir de eventos relacionados"""
+        """Cria evento consolidado a partir de eventos relacionados, considerando apenas participantes ACTIVE"""
         if not events:
             raise ValueError("Lista de eventos não pode estar vazia")
         
         # Encontra o evento mais antigo como base
         base_event = min(events, key=lambda e: e.get('start_time', ''))
         
-        # Calcula estatísticas
-        total_expected = sum(e.get('expected_count', 0) for e in events)
-        total_present = sum(e.get('present_count', 0) for e in events)
+        # Calcula estatísticas considerando apenas participantes ACTIVE
+        total_expected = 0
+        total_present = 0
+        all_active_participants = []
+        
+        for event in events:
+            participants = event.get('participants', [])
+            event_expected = 0
+            event_present = 0
+            
+            for participant in participants:
+                if participant.get('status', 'ACTIVE') == 'ACTIVE':
+                    event_expected += 1
+                    event_present += 1
+                    all_active_participants.append({
+                        'cpf': participant.get('cpf'),
+                        'name': participant.get('name'),
+                        'terminal': event.get('terminal_id'),
+                        'timestamp': participant.get('timestamp')
+                    })
+            
+            total_expected += event_expected
+            total_present += event_present
+        
         completion_percentage = (total_present / total_expected * 100) if total_expected > 0 else 0
         
-        # Determina se ainda está ativo
+        # Determina se ainda está ativo (baseado no status dos eventos originais)
         is_active = any(e.get('is_active', False) for e in events)
         
         # Determina tempo de fim
@@ -130,11 +169,13 @@ class EventCorrelator:
             'original_events': events,
             'total_expected': total_expected,
             'total_present': total_present,
+            'active_participants': all_active_participants,
             'completion_percentage': round(completion_percentage, 2),
             'is_active': is_active,
             'created_at': datetime.now().isoformat(),
             'correlation_method': 'temporal_window',
-            'tolerance_minutes': self.tolerance_minutes
+            'tolerance_minutes': self.tolerance_minutes,
+            'status_filter': 'ACTIVE_ONLY'
         }
         
         return consolidated

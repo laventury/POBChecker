@@ -105,71 +105,88 @@ class SyncService:
         # 1. Verifica se há servidor disponível
         server_info = self.discovery.get_server_info()
         if not server_info:
+            # Se não há servidor descoberto, força uma descoberta
+            print("🔍 Nenhum servidor conhecido, iniciando descoberta...")
+            self.discovery._perform_discovery()
+            server_info = self.discovery.get_server_info()
+            
+        if not server_info:
             self.stats['last_sync_status'] = 'Servidor não encontrado'
             return
-        
-        # 2. Coleta dados não sincronizados
+
+        # 2. Coleta dados não sincronizados (baseado em versão)
         event_records = self.db.get_unsynced_event_records()
         checkinout_records = self.db.get_unsynced_checkinout_records()
+        events_records = self.db.get_unsynced_events()
         
-        if not event_records and not checkinout_records:
+        if not event_records and not checkinout_records and not events_records:
             self.stats['last_sync_status'] = 'Nenhum dado para sincronizar'
             return
-        
+
         # 3. Prepara dados para envio
-        sync_data = self._prepare_sync_data(event_records, checkinout_records)
+        sync_data = self._prepare_sync_data(event_records, checkinout_records, events_records)
         
         # 4. Envia dados para o servidor
         success = self._send_to_server(server_info, sync_data)
         
         if success:
-            # 5. Marca registros como sincronizados
-            event_ids = [record[0] for record in event_records]
-            checkinout_ids = [record[0] for record in checkinout_records]
-            
-            if self.db.mark_records_as_synced(event_ids, checkinout_ids):
-                self.stats['successful_syncs'] += 1
-                self.stats['records_synced'] += len(event_records) + len(checkinout_records)
-                self.stats['last_sync_status'] = f'Sucesso - {len(event_records)} eventos, {len(checkinout_records)} check-ins/outs'
-                print(f"✅ Sincronização realizada com sucesso")
-            else:
-                self.stats['failed_syncs'] += 1
-                self.stats['last_sync_status'] = 'Falha ao marcar registros como sincronizados'
-                print(f"⚠️ Dados enviados mas falha ao marcar como sincronizados")
+            # 5. Com sistema baseado em versão, não precisa marcar como sincronizado
+            self.stats['successful_syncs'] += 1
+            self.stats['records_synced'] += len(event_records) + len(checkinout_records) + len(events_records)
+            self.stats['last_sync_status'] = f'Sucesso - {len(events_records)} eventos, {len(event_records)} check-events, {len(checkinout_records)} check-ins/outs'
+            print(f"✅ Sincronização realizada com sucesso")
         else:
             self.stats['failed_syncs'] += 1
             self.stats['last_sync_status'] = 'Falha ao enviar dados para servidor'
         
         self.stats['last_sync_time'] = self.time_sync.get_synced_time().isoformat()
     
-    def _prepare_sync_data(self, event_records, checkinout_records):
-        """Prepara dados para envio ao servidor"""
+    def _prepare_sync_data(self, event_records, checkinout_records, events_records=None):
+        """Prepara dados para envio ao servidor com novo formato baseado em versão"""
         sync_data = {
             'terminal_id': self.terminal_id,
             'location': self.location,
             'sync_timestamp': self.time_sync.get_synced_time().isoformat(),
+            'events': [],
             'check_events': [],
             'check_in_outs': []
         }
         
-        # Formata registros de eventos
+        # Formata eventos (nova funcionalidade)
+        if events_records:
+            for record in events_records:
+                sync_data['events'].append({
+                    'id': record[0],
+                    'Open': record[1],
+                    'Close': record[2],
+                    'Closed': record[3],
+                    'version': record[4],
+                    'last_modified': record[5]
+                })
+        
+        # Formata registros de check_events com novo formato
         for record in event_records:
             sync_data['check_events'].append({
                 'id': record[0],
                 'CPF': record[1],
                 'Name': record[2],
                 'Timestamp': record[3],
-                'Event': record[4]
+                'Event': record[4],
+                'Status': record[5],
+                'version': record[6],
+                'last_modified': record[7]
             })
         
-        # Formata registros de check in/out
+        # Formata registros de check in/out com novo formato
         for record in checkinout_records:
             sync_data['check_in_outs'].append({
                 'id': record[0],
                 'CPF': record[1],
                 'Name': record[2],
                 'Type': record[3],
-                'Timestamp': record[4]
+                'Timestamp': record[4],
+                'version': record[5],
+                'last_modified': record[6]
             })
         
         return sync_data
@@ -230,7 +247,8 @@ class SyncService:
             'sync_stats': self.stats.copy(),
             'time_sync_status': self.time_sync.get_time_status(),
             'pending_records': {
-                'events': len(self.db.get_unsynced_event_records()),
+                'events': len(self.db.get_unsynced_events()),
+                'check_events': len(self.db.get_unsynced_event_records()),
                 'check_in_outs': len(self.db.get_unsynced_checkinout_records())
             }
         }

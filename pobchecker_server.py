@@ -88,6 +88,21 @@ class ConsolidatorDatabase:
         try:
             # Tabela de eventos consolidados
             self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS events_consolidated (
+                    id SERIAL PRIMARY KEY,
+                    "terminal_id" VARCHAR(255) NOT NULL,
+                    "original_id" INTEGER NOT NULL,
+                    "Open" VARCHAR(255) NOT NULL,
+                    "Close" VARCHAR(255),
+                    "Closed" INTEGER DEFAULT 0,
+                    "version" INTEGER NOT NULL,
+                    "sync_timestamp" VARCHAR(255) NOT NULL,
+                    UNIQUE("terminal_id", "original_id")
+                )
+            ''')
+
+            # Tabela de eventos consolidados
+            self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS check_event_consolidated (
                     id SERIAL PRIMARY KEY,
                     "terminal_id" VARCHAR(255) NOT NULL,
@@ -96,6 +111,8 @@ class ConsolidatorDatabase:
                     "Name" VARCHAR(255),
                     "Timestamp" VARCHAR(255) NOT NULL,
                     "Event" INTEGER,
+                    "Status" VARCHAR(50) DEFAULT 'ACTIVE',
+                    "version" INTEGER NOT NULL,
                     "sync_timestamp" VARCHAR(255) NOT NULL,
                     UNIQUE("terminal_id", "original_id")
                 )
@@ -111,6 +128,7 @@ class ConsolidatorDatabase:
                     "Name" VARCHAR(255),
                     "Type" VARCHAR(50) NOT NULL,
                     "Timestamp" VARCHAR(255) NOT NULL,
+                    "version" INTEGER NOT NULL,
                     "sync_timestamp" VARCHAR(255) NOT NULL,
                     UNIQUE("terminal_id", "original_id")
                 )
@@ -136,6 +154,21 @@ class ConsolidatorDatabase:
         """Cria tabelas SQLite"""
         # Tabela de eventos consolidados
         self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS events_consolidated (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                terminal_id TEXT NOT NULL,
+                original_id INTEGER NOT NULL,
+                Open TEXT NOT NULL,
+                Close TEXT,
+                Closed INTEGER DEFAULT 0,
+                version INTEGER NOT NULL,
+                sync_timestamp TEXT NOT NULL,
+                UNIQUE(terminal_id, original_id)
+            )
+        ''')
+
+        # Tabela de eventos consolidados
+        self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS check_event_consolidated (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 terminal_id TEXT NOT NULL,
@@ -144,6 +177,8 @@ class ConsolidatorDatabase:
                 Name TEXT,
                 Timestamp TEXT NOT NULL,
                 Event INTEGER,
+                Status TEXT DEFAULT 'ACTIVE',
+                version INTEGER NOT NULL,
                 sync_timestamp TEXT NOT NULL,
                 UNIQUE(terminal_id, original_id)
             )
@@ -159,6 +194,7 @@ class ConsolidatorDatabase:
                 Name TEXT,
                 Type TEXT NOT NULL,
                 Timestamp TEXT NOT NULL,
+                version INTEGER NOT NULL,
                 sync_timestamp TEXT NOT NULL,
                 UNIQUE(terminal_id, original_id)
             )
@@ -177,60 +213,124 @@ class ConsolidatorDatabase:
         self.conn.commit()
         print("✅ Tabelas SQLite criadas/verificadas")
     
-    def insert_sync_data(self, terminal_id: str, location: str, check_events: List[Dict], check_in_outs: List[Dict]) -> Dict:
-        """Insere dados de sincronização"""
+    def insert_sync_data(self, terminal_id: str, location: str, events: List[Dict], check_events: List[Dict], check_in_outs: List[Dict]) -> Dict:
+        """Insere dados de sincronização com controle de versão"""
         with self._lock:
             sync_timestamp = datetime.now().isoformat()
             events_received = 0
+            check_events_received = 0
             checkinouts_received = 0
             
             try:
-                # Insere eventos
+                # Insere/atualiza eventos
+                for event in events:
+                    try:
+                        if self.db_type == 'postgresql':
+                            self.cursor.execute('''
+                                INSERT INTO events_consolidated 
+                                ("terminal_id", "original_id", "Open", "Close", "Closed", "version", "sync_timestamp")
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT ("terminal_id", "original_id") 
+                                DO UPDATE SET
+                                    "Open" = EXCLUDED."Open",
+                                    "Close" = EXCLUDED."Close",
+                                    "Closed" = EXCLUDED."Closed",
+                                    "version" = EXCLUDED."version",
+                                    "sync_timestamp" = EXCLUDED."sync_timestamp"
+                                WHERE events_consolidated."version" < EXCLUDED."version"
+                            ''', (
+                                terminal_id,
+                                event['id'],
+                                event.get('Open', ''),
+                                event.get('Close'),
+                                event.get('Closed', 0),
+                                event.get('version', 1),
+                                sync_timestamp
+                            ))
+                        else:
+                            self.cursor.execute('''
+                                INSERT OR REPLACE INTO events_consolidated 
+                                (terminal_id, original_id, Open, Close, Closed, version, sync_timestamp)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ''', (
+                                terminal_id,
+                                event['id'],
+                                event.get('Open', ''),
+                                event.get('Close'),
+                                event.get('Closed', 0),
+                                event.get('version', 1),
+                                sync_timestamp
+                            ))
+                        events_received += 1
+                    except Exception as e:
+                        print(f"Erro ao inserir evento {event.get('id')}: {e}")
+
+                # Insere/atualiza check_events
                 for event in check_events:
                     try:
                         if self.db_type == 'postgresql':
                             self.cursor.execute('''
                                 INSERT INTO check_event_consolidated 
-                                ("terminal_id", "original_id", "CPF", "Name", "Timestamp", "Event", "sync_timestamp")
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                ON CONFLICT ("terminal_id", "original_id") DO NOTHING
+                                ("terminal_id", "original_id", "CPF", "Name", "Timestamp", "Event", "Status", "version", "sync_timestamp")
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT ("terminal_id", "original_id") 
+                                DO UPDATE SET
+                                    "CPF" = EXCLUDED."CPF",
+                                    "Name" = EXCLUDED."Name",
+                                    "Timestamp" = EXCLUDED."Timestamp",
+                                    "Event" = EXCLUDED."Event",
+                                    "Status" = EXCLUDED."Status",
+                                    "version" = EXCLUDED."version",
+                                    "sync_timestamp" = EXCLUDED."sync_timestamp"
+                                WHERE check_event_consolidated."version" < EXCLUDED."version"
                             ''', (
                                 terminal_id,
                                 event['id'],
                                 event.get('CPF', ''),
                                 event.get('Name', ''),
                                 event.get('Timestamp', ''),
-                                event.get('Event', 0),
+                                event.get('Event'),
+                                event.get('Status', 'ACTIVE'),
+                                event.get('version', 1),
                                 sync_timestamp
                             ))
                         else:
                             self.cursor.execute('''
-                                INSERT OR IGNORE INTO check_event_consolidated 
-                                (terminal_id, original_id, CPF, Name, Timestamp, Event, sync_timestamp)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                INSERT OR REPLACE INTO check_event_consolidated 
+                                (terminal_id, original_id, CPF, Name, Timestamp, Event, Status, version, sync_timestamp)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ''', (
                                 terminal_id,
                                 event['id'],
                                 event.get('CPF', ''),
                                 event.get('Name', ''),
                                 event.get('Timestamp', ''),
-                                event.get('Event', 0),
+                                event.get('Event'),
+                                event.get('Status', 'ACTIVE'),
+                                event.get('version', 1),
                                 sync_timestamp
                             ))
-                        if self.cursor.rowcount > 0:
-                            events_received += 1
+                        check_events_received += 1
                     except Exception as e:
-                        print(f"Erro ao inserir evento {event.get('id')}: {e}")
-                
-                # Insere check in/outs
+                        print(f"Erro ao inserir check_event {event.get('id')}: {e}")
+
+                # Insere/atualiza check_in_outs
                 for checkinout in check_in_outs:
                     try:
                         if self.db_type == 'postgresql':
                             self.cursor.execute('''
                                 INSERT INTO check_in_out_consolidated 
-                                ("terminal_id", "original_id", "CPF", "Name", "Type", "Timestamp", "sync_timestamp")
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                ON CONFLICT ("terminal_id", "original_id") DO NOTHING
+                                ("terminal_id", "original_id", "CPF", "Name", "Type", "Timestamp", "version", "sync_timestamp")
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT ("terminal_id", "original_id") 
+                                DO UPDATE SET
+                                    "CPF" = EXCLUDED."CPF",
+                                    "Name" = EXCLUDED."Name",
+                                    "Type" = EXCLUDED."Type",
+                                    "Timestamp" = EXCLUDED."Timestamp",
+                                    "version" = EXCLUDED."version",
+                                    "sync_timestamp" = EXCLUDED."sync_timestamp"
+                                WHERE check_in_out_consolidated."version" < EXCLUDED."version"
                             ''', (
                                 terminal_id,
                                 checkinout['id'],
@@ -238,13 +338,14 @@ class ConsolidatorDatabase:
                                 checkinout.get('Name', ''),
                                 checkinout.get('Type', ''),
                                 checkinout.get('Timestamp', ''),
+                                checkinout.get('version', 1),
                                 sync_timestamp
                             ))
                         else:
                             self.cursor.execute('''
-                                INSERT OR IGNORE INTO check_in_out_consolidated 
-                                (terminal_id, original_id, CPF, Name, Type, Timestamp, sync_timestamp)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                INSERT OR REPLACE INTO check_in_out_consolidated 
+                                (terminal_id, original_id, CPF, Name, Type, Timestamp, version, sync_timestamp)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                             ''', (
                                 terminal_id,
                                 checkinout['id'],
@@ -252,10 +353,10 @@ class ConsolidatorDatabase:
                                 checkinout.get('Name', ''),
                                 checkinout.get('Type', ''),
                                 checkinout.get('Timestamp', ''),
+                                checkinout.get('version', 1),
                                 sync_timestamp
                             ))
-                        if self.cursor.rowcount > 0:
-                            checkinouts_received += 1
+                        checkinouts_received += 1
                     except Exception as e:
                         print(f"Erro ao inserir check in/out {checkinout.get('id')}: {e}")
                 
@@ -283,7 +384,8 @@ class ConsolidatorDatabase:
                 
                 return {
                     'status': 'success',
-                    'check_events_received': events_received,
+                    'events_received': events_received,
+                    'check_events_received': check_events_received,
                     'check_in_outs_received': checkinouts_received,
                     'sync_timestamp': sync_timestamp
                 }
@@ -314,18 +416,18 @@ class ConsolidatorDatabase:
             return terminals
     
     def get_pob_status(self) -> Dict:
-        """Retorna status consolidado do POB"""
+        """Retorna status consolidado do POB calculado em tempo real baseado em CHECK_IN_OUT"""
         with self._lock:
-            # Busca o último status de cada pessoa
+            # Busca o último status de cada pessoa de todos os terminais
             if self.db_type == 'postgresql':
                 self.cursor.execute('''
-                    SELECT DISTINCT ON ("CPF") "CPF", "Name", "Type", "Timestamp"
+                    SELECT DISTINCT ON ("CPF") "CPF", "Name", "Type", "Timestamp", "terminal_id"
                     FROM check_in_out_consolidated
                     ORDER BY "CPF", "Timestamp" DESC
                 ''')
             else:
                 self.cursor.execute('''
-                    SELECT CPF, Name, Type, Timestamp
+                    SELECT CPF, Name, Type, Timestamp, terminal_id
                     FROM check_in_out_consolidated c1
                     WHERE Timestamp = (
                         SELECT MAX(Timestamp) 
@@ -336,31 +438,64 @@ class ConsolidatorDatabase:
                 ''')
             
             people_status = {}
-            for row in self.cursor.fetchall():
-                people_status[row[0]] = {
-                    'name': row[1],
-                    'status': row[2],
-                    'last_timestamp': row[3]
-                }
+            pob_count = 0
+            onshore_count = 0
+            persons_on_board = []
+            terminal_stats = {}
             
-            # Conta pessoas a bordo
-            pob_count = sum(1 for p in people_status.values() if p['status'] == 'IN')
+            for row in self.cursor.fetchall():
+                cpf = row[0]
+                name = row[1]
+                status = row[2]
+                timestamp = row[3]
+                terminal_id = row[4] if len(row) > 4 else 'unknown'
+                
+                people_status[cpf] = {
+                    'name': name,
+                    'status': status,
+                    'last_timestamp': timestamp,
+                    'terminal': terminal_id
+                }
+                
+                # Conta pessoas baseado no último movimento
+                if status == 'IN':
+                    pob_count += 1
+                    persons_on_board.append({
+                        'cpf': cpf,
+                        'name': name,
+                        'last_movement': timestamp,
+                        'terminal': terminal_id
+                    })
+                    
+                    # Estatísticas por terminal
+                    if terminal_id not in terminal_stats:
+                        terminal_stats[terminal_id] = 0
+                    terminal_stats[terminal_id] += 1
+                    
+                elif status == 'OUT':
+                    onshore_count += 1
             
             return {
-                'pob_total': pob_count,
+                'total_pob': pob_count,
+                'total_onshore': onshore_count,
+                'total_persons': pob_count + onshore_count,
+                'persons_on_board': persons_on_board,
                 'people_status': people_status,
+                'terminal_stats': terminal_stats,
+                'calculation_method': 'Real-time based on CHECK_IN_OUT last movements',
                 'last_update': datetime.now().isoformat()
             }
     
     def get_active_events(self) -> List[Dict]:
-        """Retorna eventos ativos"""
+        """Retorna eventos ativos considerando apenas registros com Status = 'ACTIVE'"""
         with self._lock:
-            # Por simplicidade, considera eventos das últimas 24 horas como ativos
+            # Busca eventos com participantes ativos das últimas 24 horas
             if self.db_type == 'postgresql':
                 self.cursor.execute('''
                     SELECT DISTINCT "Event", COUNT(*) as participants
                     FROM check_event_consolidated
-                    WHERE "Timestamp"::timestamp > NOW() - INTERVAL '1 day'
+                    WHERE "Status" = 'ACTIVE' 
+                    AND "Timestamp"::timestamp > NOW() - INTERVAL '1 day'
                     GROUP BY "Event"
                     ORDER BY "Event"
                 ''')
@@ -368,17 +503,42 @@ class ConsolidatorDatabase:
                 self.cursor.execute('''
                     SELECT DISTINCT Event, COUNT(*) as participants
                     FROM check_event_consolidated
-                    WHERE datetime(Timestamp) > datetime('now', '-1 day')
+                    WHERE Status = 'ACTIVE' 
+                    AND datetime(Timestamp) > datetime('now', '-1 day')
                     GROUP BY Event
                     ORDER BY Event
                 ''')
             
             events = []
             for row in self.cursor.fetchall():
+                event_id = row[0]
+                participants = row[1]
+                
+                # Busca detalhes do evento das tabelas consolidadas
+                if self.db_type == 'postgresql':
+                    self.cursor.execute('''
+                        SELECT "Open", "Close", "Closed"
+                        FROM events_consolidated
+                        WHERE "original_id" = %s
+                        LIMIT 1
+                    ''', (event_id,))
+                else:
+                    self.cursor.execute('''
+                        SELECT Open, Close, Closed
+                        FROM events_consolidated
+                        WHERE original_id = ?
+                        LIMIT 1
+                    ''', (event_id,))
+                
+                event_details = self.cursor.fetchone()
+                
                 events.append({
-                    'event_id': row[0],
-                    'participants': row[1],
-                    'status': 'active'
+                    'event_id': event_id,
+                    'participants': participants,
+                    'open': event_details[0] if event_details else None,
+                    'close': event_details[1] if event_details else None,
+                    'closed': event_details[2] if event_details else 0,
+                    'status': 'active' if not (event_details and event_details[2]) else 'closed'
                 })
             
             return events
@@ -455,7 +615,7 @@ class ConsolidatorServer:
             data: Dict[str, Any],
             x_api_key: Optional[str] = Header(None)
         ):
-            """Endpoint para sincronização de dados dos terminais"""
+            """Endpoint para sincronização de dados dos terminais com controle de versão"""
             
             # Validação da API key
             expected_key = self.config.get('network', {}).get('api_key', '')
@@ -468,14 +628,16 @@ class ConsolidatorServer:
             
             terminal_id = data['terminal_id']
             location = data.get('location', 'Local não especificado')
+            events = data.get('events', [])
             check_events = data.get('check_events', [])
             check_in_outs = data.get('check_in_outs', [])
             
             try:
-                result = self.db.insert_sync_data(terminal_id, location, check_events, check_in_outs)
+                result = self.db.insert_sync_data(terminal_id, location, events, check_events, check_in_outs)
                 
                 print(f"✅ Sincronização de {terminal_id}:")
-                print(f"   Eventos: {result['check_events_received']}")
+                print(f"   Eventos: {result['events_received']}")
+                print(f"   Check Events: {result['check_events_received']}")
                 print(f"   Check-ins/outs: {result['check_in_outs_received']}")
                 
                 return result
@@ -507,10 +669,12 @@ class ConsolidatorServer:
             active_events = self.db.get_active_events()
             
             return {
-                'pob_total': pob_status['pob_total'],
+                'pob_total': pob_status.get('total_pob', 0),
+                'onshore_total': pob_status.get('total_onshore', 0),
                 'events_active': len(active_events),
                 'terminals_online': len([t for t in terminals if t['status'] == 'online']),
                 'terminals_offline': len([t for t in terminals if t['status'] == 'offline']),
+                'calculation_method': pob_status.get('calculation_method', 'Unknown'),
                 'last_update': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
             }
         

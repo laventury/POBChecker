@@ -24,29 +24,30 @@ class Database:
         """
         Cria as tabelas 'POB','EVENTS','CHECK_EVENT','CHECK_IN_OUT' se elas ainda não existirem no banco.
         """
-        # Tabela de Pessoas a Bordo (POB)
+        # Tabela de Pessoas a Bordo (POB) - NÃO SINCRONIZADA
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS POB (
                 CPF TEXT PRIMARY KEY,
                 Name TEXT NOT NULL,
-                Onshore INTEGER DEFAULT 1
+                Onshore INTEGER DEFAULT 1,
+                version INTEGER DEFAULT 1,
+                last_modified TEXT DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
-        # Adiciona colunas Synced se necessário
-        self._add_synced_columns()
 
-        # Tabela de registro de eventos (sem campo nome, com Open e Close)
+        # Tabela de registro de eventos - SINCRONIZADA
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS EVENTS (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Open TEXT NOT NULL,
                 Close TEXT NULL,
-                Closed INTEGER DEFAULT 0   
+                Closed INTEGER DEFAULT 0,
+                version INTEGER DEFAULT 1,
+                last_modified TEXT DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
-        # Tabela de registro de checagem de pessoas nos eventos (CEV mode)
+        # Tabela de registro de checagem de pessoas nos eventos - SINCRONIZADA
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS CHECK_EVENT (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,13 +55,15 @@ class Database:
                 Name TEXT,
                 Timestamp TEXT NOT NULL,
                 Event INTEGER,
-                Synced INTEGER DEFAULT 0,
+                Status TEXT DEFAULT 'ACTIVE',
+                version INTEGER DEFAULT 1,
+                last_modified TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (CPF) REFERENCES POB (CPF),
                 FOREIGN KEY (Event) REFERENCES EVENTS (ID)       
             )
         ''')
 
-        # Tabela de registro de check in/out (CIO mode)
+        # Tabela de registro de check in/out - SINCRONIZADA
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS CHECK_IN_OUT (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,10 +71,14 @@ class Database:
                 Name TEXT,
                 Type TEXT NOT NULL,
                 Timestamp TEXT NOT NULL,
-                Synced INTEGER DEFAULT 0,
+                version INTEGER DEFAULT 1,
+                last_modified TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (CPF) REFERENCES POB (CPF)     
             )
         ''')
+        
+        # Adiciona novas colunas se necessário (para compatibilidade com banco existente)
+        self._add_version_columns()
         
         self.conn.commit()
 
@@ -240,23 +247,23 @@ class Database:
 
     def create_event(self):
         """
-        Cria um novo evento e retorna seu ID.
+        Cria um novo evento e retorna seu ID com controle de versão.
         """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.cursor.execute("INSERT INTO EVENTS (Open) VALUES (?)", (timestamp,))
+        self.cursor.execute("INSERT INTO EVENTS (Open, version, last_modified) VALUES (?, 1, ?)", (timestamp, timestamp))
         self.conn.commit()
         return self.cursor.lastrowid
 
     def close_event(self, event_id):
         """
-        Fecha um evento específico.
+        Fecha um evento específico com controle de versão.
         """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.cursor.execute('''
             UPDATE EVENTS 
-            SET Close = ?, Closed = 1 
+            SET Close = ?, Closed = 1, version = version + 1, last_modified = ?
             WHERE ID = ?
-        ''', (timestamp, event_id))
+        ''', (timestamp, timestamp, event_id))
         self.conn.commit()
 
     def get_active_event(self):
@@ -274,23 +281,23 @@ class Database:
 
     def record_check_in_out(self, cpf, nome, tipo):
         """
-        Registra uma operação de check in/out.
+        Registra uma operação de check in/out com controle de versão.
         """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.cursor.execute('''
-            INSERT INTO CHECK_IN_OUT (CPF, Name, Type, Timestamp)
-            VALUES (?, ?, ?, ?)
-        ''', (cpf, nome, tipo, timestamp))
+            INSERT INTO CHECK_IN_OUT (CPF, Name, Type, Timestamp, version, last_modified)
+            VALUES (?, ?, ?, ?, 1, ?)
+        ''', (cpf, nome, tipo, timestamp, timestamp))
         self.conn.commit()
 
     def record_check_event(self, cpf, nome, event_id):
         """
         Registra a presença de uma pessoa em um evento.
-        Armazena o CPF, nome e o timestamp atual.
+        Armazena o CPF, nome e o timestamp atual com controle de versão.
         """
-        # Garante que a mesma pessoa não seja registrada múltiplas vezes no mesmo evento
+        # Garante que a mesma pessoa não seja registrada múltiplas vezes no mesmo evento (considerando apenas registros ACTIVE)
         self.cursor.execute('''
-            SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ?
+            SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ? AND Status = 'ACTIVE'
         ''', (cpf, event_id))
         
         if self.cursor.fetchone():
@@ -298,45 +305,54 @@ class Database:
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.cursor.execute('''
-            INSERT INTO CHECK_EVENT (CPF, Name, Timestamp, Event) 
-            VALUES (?, ?, ?, ?)
-        ''', (cpf, nome, timestamp, event_id))
+            INSERT INTO CHECK_EVENT (CPF, Name, Timestamp, Event, Status, version, last_modified) 
+            VALUES (?, ?, ?, ?, 'ACTIVE', 1, ?)
+        ''', (cpf, nome, timestamp, event_id, timestamp))
         self.conn.commit()
         return True
 
     def get_checks_in_event(self, event_id):
         """
-        Retorna um conjunto de CPFs de todas as pessoas que já tiveram a presença no evento
+        Retorna um conjunto de CPFs de todas as pessoas que têm presença ATIVA no evento
         """
         if not event_id:
             return set()
-        self.cursor.execute("SELECT CPF FROM CHECK_EVENT WHERE Event = ?", (event_id,))
+        self.cursor.execute("SELECT CPF FROM CHECK_EVENT WHERE Event = ? AND Status = 'ACTIVE'", (event_id,))
         return {row[0] for row in self.cursor.fetchall()}
 
     def is_person_checked_in_event(self, cpf, event_id):
         """
-        Verifica se uma pessoa já teve a presença registrada em um evento específico.
+        Verifica se uma pessoa tem presença ATIVA registrada em um evento específico.
         """
         if not event_id:
             return False
-        self.cursor.execute("SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ?", (cpf, event_id))
+        self.cursor.execute("SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ? AND Status = 'ACTIVE'", (cpf, event_id))
         return self.cursor.fetchone() is not None
 
     def remove_check_event(self, cpf, event_id):
         """
-        Remove o registro de presença de uma pessoa em um evento (estorno de checagem).
-        Retorna True se o registro foi removido com sucesso, False caso contrário.
+        Cancela o registro de presença de uma pessoa em um evento (estorno de checagem).
+        Altera o status para 'CANCELED' ao invés de excluir fisicamente.
+        Retorna True se o registro foi cancelado com sucesso, False caso contrário.
         """
         if not event_id:
             return False
             
-        # Verifica se existe o registro antes de tentar remover
-        self.cursor.execute("SELECT 1 FROM CHECK_EVENT WHERE CPF = ? AND Event = ?", (cpf, event_id))
-        if not self.cursor.fetchone():
+        # Verifica se existe o registro ativo antes de tentar cancelar
+        self.cursor.execute("SELECT ID FROM CHECK_EVENT WHERE CPF = ? AND Event = ? AND Status = 'ACTIVE'", (cpf, event_id))
+        record = self.cursor.fetchone()
+        if not record:
             return False
             
-        # Remove o registro
-        self.cursor.execute("DELETE FROM CHECK_EVENT WHERE CPF = ? AND Event = ?", (cpf, event_id))
+        # Atualiza o status para CANCELED e incrementa versão
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.cursor.execute('''
+            UPDATE CHECK_EVENT 
+            SET Status = 'CANCELED', 
+                version = version + 1, 
+                last_modified = ? 
+            WHERE CPF = ? AND Event = ? AND Status = 'ACTIVE'
+        ''', (timestamp, cpf, event_id))
         self.conn.commit()
         return True
 
@@ -400,41 +416,78 @@ class Database:
         self.cursor.execute("SELECT CPF, Name FROM POB WHERE CPF = ?", (cpf_clean,))
         return self.cursor.fetchone()
 
-    def _add_synced_columns(self):
+    def _add_version_columns(self):
         """
-        Adiciona colunas Synced nas tabelas CHECK_EVENT e CHECK_IN_OUT se não existirem.
+        Adiciona colunas de versionamento (version, last_modified, Status) nas tabelas se não existirem.
         """
         try:
-            # Verifica se a coluna Synced já existe na tabela CHECK_EVENT
+            # Verifica e adiciona colunas na tabela POB
+            self.cursor.execute("PRAGMA table_info(POB)")
+            pob_columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'version' not in pob_columns:
+                self.cursor.execute("ALTER TABLE POB ADD COLUMN version INTEGER DEFAULT 1")
+                print("Coluna version adicionada à tabela POB")
+            
+            if 'last_modified' not in pob_columns:
+                self.cursor.execute("ALTER TABLE POB ADD COLUMN last_modified TEXT DEFAULT CURRENT_TIMESTAMP")
+                print("Coluna last_modified adicionada à tabela POB")
+
+            # Verifica e adiciona colunas na tabela EVENTS
+            self.cursor.execute("PRAGMA table_info(EVENTS)")
+            events_columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'version' not in events_columns:
+                self.cursor.execute("ALTER TABLE EVENTS ADD COLUMN version INTEGER DEFAULT 1")
+                print("Coluna version adicionada à tabela EVENTS")
+            
+            if 'last_modified' not in events_columns:
+                self.cursor.execute("ALTER TABLE EVENTS ADD COLUMN last_modified TEXT DEFAULT CURRENT_TIMESTAMP")
+                print("Coluna last_modified adicionada à tabela EVENTS")
+
+            # Verifica e adiciona colunas na tabela CHECK_EVENT
             self.cursor.execute("PRAGMA table_info(CHECK_EVENT)")
-            columns = [column[1] for column in self.cursor.fetchall()]
+            check_event_columns = [column[1] for column in self.cursor.fetchall()]
             
-            if 'Synced' not in columns:
-                self.cursor.execute("ALTER TABLE CHECK_EVENT ADD COLUMN Synced INTEGER DEFAULT 0")
-                print("Coluna Synced adicionada à tabela CHECK_EVENT")
+            if 'Status' not in check_event_columns:
+                self.cursor.execute("ALTER TABLE CHECK_EVENT ADD COLUMN Status TEXT DEFAULT 'ACTIVE'")
+                print("Coluna Status adicionada à tabela CHECK_EVENT")
+                
+            if 'version' not in check_event_columns:
+                self.cursor.execute("ALTER TABLE CHECK_EVENT ADD COLUMN version INTEGER DEFAULT 1")
+                print("Coluna version adicionada à tabela CHECK_EVENT")
             
-            # Verifica se a coluna Synced já existe na tabela CHECK_IN_OUT
+            if 'last_modified' not in check_event_columns:
+                self.cursor.execute("ALTER TABLE CHECK_EVENT ADD COLUMN last_modified TEXT DEFAULT CURRENT_TIMESTAMP")
+                print("Coluna last_modified adicionada à tabela CHECK_EVENT")
+
+            # Verifica e adiciona colunas na tabela CHECK_IN_OUT
             self.cursor.execute("PRAGMA table_info(CHECK_IN_OUT)")
-            columns = [column[1] for column in self.cursor.fetchall()]
+            check_io_columns = [column[1] for column in self.cursor.fetchall()]
             
-            if 'Synced' not in columns:
-                self.cursor.execute("ALTER TABLE CHECK_IN_OUT ADD COLUMN Synced INTEGER DEFAULT 0")
-                print("Coluna Synced adicionada à tabela CHECK_IN_OUT")
+            if 'version' not in check_io_columns:
+                self.cursor.execute("ALTER TABLE CHECK_IN_OUT ADD COLUMN version INTEGER DEFAULT 1")
+                print("Coluna version adicionada à tabela CHECK_IN_OUT")
+            
+            if 'last_modified' not in check_io_columns:
+                self.cursor.execute("ALTER TABLE CHECK_IN_OUT ADD COLUMN last_modified TEXT DEFAULT CURRENT_TIMESTAMP")
+                print("Coluna last_modified adicionada à tabela CHECK_IN_OUT")
                 
             self.conn.commit()
+            
         except Exception as e:
-            print(f"Erro ao adicionar colunas Synced: {e}")
+            print(f"Erro ao adicionar colunas de versionamento: {e}")
 
     def get_unsynced_event_records(self):
         """
-        Retorna registros de eventos não sincronizados.
+        Retorna registros de eventos não sincronizados baseado em versão.
         """
         with self._lock:
             try:
                 self.cursor.execute('''
-                    SELECT ID, CPF, Name, Timestamp, Event 
+                    SELECT ID, CPF, Name, Timestamp, Event, Status, version, last_modified
                     FROM CHECK_EVENT 
-                    WHERE Synced = 0
+                    ORDER BY version ASC
                 ''')
                 return self.cursor.fetchall()
             except Exception as e:
@@ -443,47 +496,44 @@ class Database:
 
     def get_unsynced_checkinout_records(self):
         """
-        Retorna registros de check in/out não sincronizados.
+        Retorna registros de check in/out não sincronizados baseado em versão.
         """
         with self._lock:
             try:
                 self.cursor.execute('''
-                    SELECT ID, CPF, Name, Type, Timestamp 
+                    SELECT ID, CPF, Name, Type, Timestamp, version, last_modified
                     FROM CHECK_IN_OUT 
-                    WHERE Synced = 0
+                    ORDER BY version ASC
                 ''')
                 return self.cursor.fetchall()
             except Exception as e:
                 print(f"Erro ao buscar registros de check in/out não sincronizados: {e}")
                 return []
 
-    def mark_records_as_synced(self, event_ids=None, checkinout_ids=None):
+    def get_unsynced_events(self):
         """
-        Marca registros como sincronizados.
+        Retorna eventos não sincronizados baseado em versão.
         """
         with self._lock:
             try:
-                if event_ids:
-                    placeholders = ','.join(['?' for _ in event_ids])
-                    self.cursor.execute(f'''
-                        UPDATE CHECK_EVENT 
-                        SET Synced = 1 
-                        WHERE ID IN ({placeholders})
-                    ''', event_ids)
-                
-                if checkinout_ids:
-                    placeholders = ','.join(['?' for _ in checkinout_ids])
-                    self.cursor.execute(f'''
-                        UPDATE CHECK_IN_OUT 
-                        SET Synced = 1 
-                        WHERE ID IN ({placeholders})
-                    ''', checkinout_ids)
-                    
-                self.conn.commit()
-                return True
+                self.cursor.execute('''
+                    SELECT ID, Open, Close, Closed, version, last_modified
+                    FROM EVENTS 
+                    ORDER BY version ASC
+                ''')
+                return self.cursor.fetchall()
             except Exception as e:
-                print(f"Erro ao marcar registros como sincronizados: {e}")
-                return False
+                print(f"Erro ao buscar eventos não sincronizados: {e}")
+                return []
+
+    def mark_records_as_synced(self, event_ids=None, checkinout_ids=None):
+        """
+        Função mantida para compatibilidade, mas não marca nada como sincronizado
+        pois agora a sincronização é baseada em versão, não em flag.
+        """
+        # A sincronização agora é baseada em versão, não em flag de "synced"
+        # Esta função é mantida apenas para compatibilidade
+        return True
 
     def __del__(self):
         """
