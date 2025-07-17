@@ -23,8 +23,8 @@
         "host": "localhost",
         "port": 5432,
         "name": "pobchecker_db",
-        "user": "pobchecker",
-        "password": "pobchecker"
+        "user": "postgres",
+        "password": "postgres"
       }
     },
     "network": {
