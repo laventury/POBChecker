@@ -33,10 +33,17 @@ O **POBChecker** é um sistema desenvolvido para controle de presença do POB (P
 
 ### Pré-requisitos
 
-- Python 3.7 ou superior
+- Python 3.7 ou superior (Python 3.13+ recomendado)
 - Câmera conectada (USB ou integrada)
 - Conexão com a internet (para instalação inicial)
 - Rede local (para sincronização multi-terminal - opcional)
+
+### ⚠️ Compatibilidade Python 3.13+
+
+Para Python 3.13+, se encontrar erros de compatibilidade com FastAPI/Pydantic:
+```bash
+pip install --upgrade fastapi pydantic
+```
 
 ### Instalação no Raspberry Pi (Recomendado)
 

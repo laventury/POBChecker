@@ -1,10 +1,14 @@
 # Dependências para funcionalidades de rede do POBChecker
 # Instale com: pip install -r requirements_network.txt
 
-# Framework web e servidor
-fastapi==0.104.1
-uvicorn==0.24.0
-python-multipart==0.0.6
+# IMPORTANTE: Para Python 3.13+, use as versões mais recentes
+# Se encontrar erros de compatibilidade, execute: pip install --upgrade fastapi pydantic
+
+# Framework web e servidor (versões atualizadas para Python 3.13)
+fastapi>=0.116.1
+pydantic>=2.11.7
+uvicorn>=0.24.0
+python-multipart>=0.0.6
 
 # Descoberta de serviços via mDNS
 zeroconf==0.131.0
