@@ -37,6 +37,9 @@ def show_main_menu():
     print("13. Listar dados do consolidador")
     print("14. Executar testes do consolidador")
     print("")
+    print("🗑️  FUNÇÕES DE LIMPEZA AVANÇADA:")
+    print("15. Apagar estrutura das tabelas dos bancos")
+    print("")
     print("0. Sair")
     print("=" * 70)
 
@@ -277,6 +280,14 @@ def test_consolidator():
     except subprocess.CalledProcessError as e:
         print(f"❌ Erro ao testar consolidador: {e}")
 
+def drop_database_tables():
+    """Apaga a estrutura das tabelas dos bancos de dados"""
+    print("🗑️  Acessando utilitário para apagar estrutura das tabelas...")
+    try:
+        subprocess.run([sys.executable, "utilitarys/utilitary_system_drop_tables.py"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Erro ao executar utilitário: {e}")
+
 def main():
     """Função principal"""
     print("POBCHECKER - SISTEMA DE GERENCIAMENTO DE UTILITÁRIOS v3.0")
@@ -325,6 +336,10 @@ def main():
                 list_consolidator_data()
             elif choice == "14":
                 test_consolidator()
+                
+            # Funções de limpeza avançada
+            elif choice == "15":
+                drop_database_tables()
                 
             else:
                 print("❌ Opção inválida. Tente novamente.")
