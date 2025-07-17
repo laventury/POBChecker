@@ -58,7 +58,7 @@ Implementar sistema de sincronização de dados entre terminais e consolidador c
 
 ### **6. INTERFACE E ENDPOINTS - PRESERVAÇÃO OBRIGATÓRIA**
 - **ENDPOINTS EXISTENTES:** Manter todos os endpoints da API não relacionados à sincronização
-- **INTERFACE WEB:** Preservar interface web existente (se houver)
+- **INTERFACE WEB:** Pode ser atualizado caso necessário
 - **COMPATIBILIDADE:** Novos endpoints devem seguir padrão existente
 - **AUTENTICAÇÃO:** Manter sistema de autenticação por API key
 
@@ -132,7 +132,7 @@ terminal_status: terminal_id, location, last_sync, status, sync_count
 ### **5. LÓGICA DE SINCRONIZAÇÃO**
 
 #### **5.1 Processo de Sincronização**
-1. **Terminal:** Coleta registros não sincronizados ou com versões superiores
+1. **Terminal:** Envia os dados periodicamente das tabelas que devem ser sincronizadas. Frequencia de envio deve ser configurável no arquivo de configuração do terminal. Padrão 20s.
 2. **Envio:** Terminal envia dados para consolidador via API REST
 3. **Consolidador:** Recebe e armazena dados indexados por (terminal, tabela, id)
 4. **Verificação:** Consolidador só aceita registros com versão superior à armazenada
@@ -177,7 +177,7 @@ terminal_status: terminal_id, location, last_sync, status, sync_count
 #### **8.2 Estrutura Final**
 - **Permanente:** Código final deve ter estrutura definitiva
 - **Sem Legado:** Eliminar códigos temporários de migração
-- **Limpeza:** Manter apenas lógica de produção, eliminando logicas e estruturas temporárias que foram utlizadas no teste ou desenvolvimento. Mantenha e teste de Sistema que estão na pasta tests.
+- **Limpeza:** Manter apenas lógica de produção, eliminando logicas e estruturas temporárias após a confirmação de funcionamento. Mantenha o teste de Sistema que estão na pasta tests.
 
 ### **9. TRATAMENTO DE CONFLITOS**
 
