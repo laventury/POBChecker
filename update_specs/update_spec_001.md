@@ -87,8 +87,7 @@ Implementar sistema de sincronização de dados entre terminais e consolidador c
 ### **2. ESTRUTURA DE DADOS**
 
 #### **2.1 Renomeação de Campos**
-- **CPF → ID_PERSON:** Campo CPF será renomeado para ID_PERSON em todas as tabelas, menos a tabela POB onde será o ID da tabela.
-- **Padronização:** Uniformizar nomenclatura em todo o sistema
+- Não renomear campos existentes antes desse pacote de alterações.
 
 #### **2.2 Tabelas a Serem Sincronizadas**
 1. **EVENTS** - Eventos do sistema
@@ -109,10 +108,10 @@ Implementar sistema de sincronização de dados entre terminais e consolidador c
 
 #### **3.2 Estrutura das Tabelas do Terminal**
 ```
-POB: ID, Name, Onshore, version, last_modified (NÃO SINCRONIZADA)
+POB: CPF, Name, Onshore, version, last_modified (NÃO SINCRONIZADA)
 EVENTS: ID, Open, Close, Closed, version, last_modified
-CHECK_EVENT: ID, ID_PERSON, Name, Timestamp, Event, Status, version, last_modified
-CHECK_IN_OUT: ID, ID_PERSON, Name, Type, Timestamp, version, last_modified
+CHECK_EVENT: ID, CPF, Name, Timestamp, Event, Status, version, last_modified
+CHECK_IN_OUT: ID, CPF, Name, Type, Timestamp, version, last_modified
 ```
 
 ### **4. ESTRUTURA DO CONSOLIDADOR**
@@ -120,8 +119,8 @@ CHECK_IN_OUT: ID, ID_PERSON, Name, Type, Timestamp, version, last_modified
 #### **4.1 Tabelas Consolidadas**
 ```
 events_consolidated: terminal_id, original_id, Open, Close, Closed, version, sync_timestamp
-check_event_consolidated: terminal_id, original_id, ID_PERSON, Name, Timestamp, Event, Status, version, sync_timestamp
-check_in_out_consolidated: terminal_id, original_id, ID_PERSON, Name, Type, Timestamp, version, sync_timestamp
+check_event_consolidated: terminal_id, original_id, CPF, Name, Timestamp, Event, Status, version, sync_timestamp
+check_in_out_consolidated: terminal_id, original_id, CPF, Name, Type, Timestamp, version, sync_timestamp
 terminal_status: terminal_id, location, last_sync, status, sync_count
 ```
 
@@ -194,7 +193,6 @@ terminal_status: terminal_id, location, last_sync, status, sync_count
 ### **10. INTERFACE DO CONSOLIDADOR**
 
 #### **10.1 Alterações Necessárias**
-- **Campos:** Atualizar referências de CPF para ID
 - **Status:** Considerar campo STATUS em eventos (ACTIVE/CANCELED)
 - **Versionamento:** Exibir informações de versão e sincronização
 
@@ -202,6 +200,7 @@ terminal_status: terminal_id, location, last_sync, status, sync_count
 - **Dashboard:** Estatísticas de sincronização por terminal
 - **Monitoramento:** Status de versões e última sincronização
 - **Correlação:** Visualização de eventos correlacionados
+- **Interface Visual:** Atualiazar Interface visual WEB para padrão moderno.
 
 ---
 
@@ -209,7 +208,6 @@ terminal_status: terminal_id, location, last_sync, status, sync_count
 
 ### **1. Mudanças Obrigatórias**
 - Alteração de exclusão para STATUS em CHECK_EVENT
-- Renomeação de CPF para ID em todas as tabelas
 - Eliminação de sincronização da tabela POB
 
 ### **2. Validações Necessárias**
