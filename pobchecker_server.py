@@ -492,53 +492,48 @@ class ConsolidatorDatabase:
             # Busca eventos com participantes ativos das últimas 24 horas
             if self.db_type == 'postgresql':
                 self.cursor.execute('''
-                    SELECT DISTINCT "Event", COUNT(*) as participants
-                    FROM check_event_consolidated
-                    WHERE "Status" = 'ACTIVE' 
-                    AND "Timestamp"::timestamp > NOW() - INTERVAL '1 day'
-                    GROUP BY "Event"
-                    ORDER BY "Event"
+                                    SELECT "terminal_id", "original_id", "Open"
+                                    FROM events_consolidated
+                                    WHERE "Closed" = 0
+                                    AND "Open"::timestamp > NOW() - INTERVAL '1 day'
+                                    order by "terminal_id", "original_id"
                 ''')
             else:
                 self.cursor.execute('''
-                    SELECT DISTINCT Event, COUNT(*) as participants
-                    FROM check_event_consolidated
-                    WHERE Status = 'ACTIVE' 
-                    AND datetime(Timestamp) > datetime('now', '-1 day')
-                    GROUP BY Event
-                    ORDER BY Event
+                                    SELECT terminal_id, original_id, Open
+                                    FROM events_consolidated
+                                    WHERE Closed = 0
+                                    AND datetime(Open) > datetime('now', '-1 day')
+                                    order by terminal_id, original_id
                 ''')
             
             events = []
             for row in self.cursor.fetchall():
-                event_id = row[0]
-                participants = row[1]
+                terminal_id = row[0]
+                event_id = row[1]
+                open_time = row[2]   
                 
                 # Busca detalhes do evento das tabelas consolidadas
                 if self.db_type == 'postgresql':
                     self.cursor.execute('''
-                        SELECT "Open", "Close", "Closed"
-                        FROM events_consolidated
-                        WHERE "original_id" = %s
-                        LIMIT 1
-                    ''', (event_id,))
+                        SELECT count("id") as participants 
+                        FROM check_event_consolidated
+                        WHERE terminal_id = %s AND "original_id" = %s
+                    ''', (terminal_id, event_id))
                 else:
                     self.cursor.execute('''
-                        SELECT Open, Close, Closed
-                        FROM events_consolidated
-                        WHERE original_id = ?
-                        LIMIT 1
-                    ''', (event_id,))
-                
+                        SELECT count(id) as participants 
+                        FROM check_event_consolidated   
+                        WHERE terminal_id = ? AND original_id = ?
+                    ''', (terminal_id, event_id))
+
                 event_details = self.cursor.fetchone()
                 
                 events.append({
-                    'event_id': event_id,
-                    'participants': participants,
-                    'open': event_details[0] if event_details else None,
-                    'close': event_details[1] if event_details else None,
-                    'closed': event_details[2] if event_details else 0,
-                    'status': 'active' if not (event_details and event_details[2]) else 'closed'
+                    'terminal_id': terminal_id if terminal_id else 'unknown',
+                    'event_id': event_id if event_id else 0,
+                    'participants': event_details[0] if event_details else 0,
+                    'open': open_time if open_time else None
                 })
             
             return events
