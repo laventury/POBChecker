@@ -547,13 +547,13 @@ class ConsolidatorDatabase:
                     self.cursor.execute('''
                         SELECT count("id") as participants 
                         FROM check_event_consolidated
-                        WHERE terminal_id = %s AND "original_id" = %s
+                        WHERE terminal_id = %s AND "Event" = %s
                     ''', (terminal_id, event_id))
                 else:
                     self.cursor.execute('''
                         SELECT count(id) as participants 
                         FROM check_event_consolidated   
-                        WHERE terminal_id = ? AND original_id = ?
+                        WHERE terminal_id = ? AND "Event" = ?
                     ''', (terminal_id, event_id))
 
                 event_details = self.cursor.fetchone()
