@@ -397,11 +397,40 @@ class ConsolidatorDatabase:
     def get_terminals_status(self) -> List[Dict]:
         """Retorna status de todos os terminais"""
         with self._lock:
-            self.cursor.execute('''
-                SELECT terminal_id, location, last_sync, status, sync_count
-                FROM terminal_status
-                ORDER BY terminal_id
-            ''')
+            if self.db_type == 'postgresql':
+                self.cursor.execute('''
+                    SELECT 
+                        terminal_id, 
+                        location, 
+                        last_sync, 
+                        CASE 
+                            WHEN status = 'online' AND (
+                                -- PostgreSQL: compara se last_sync está dentro do último minuto
+                                last_sync::timestamp >= NOW() - INTERVAL '1 minute'
+                            ) THEN 'online'
+                            ELSE 'offline'
+                        END as status,
+                        sync_count
+                    FROM terminal_status
+                    ORDER BY terminal_id
+                ''')
+            else:
+                self.cursor.execute('''
+                    SELECT 
+                        terminal_id, 
+                        location, 
+                        last_sync, 
+                        CASE 
+                            WHEN status = 'online' AND (
+                                -- SQLite: compara se last_sync está dentro do último minuto
+                                datetime(last_sync) >= datetime('now', '-1 minute')
+                            ) THEN 'online'
+                            ELSE 'offline'
+                        END as status,
+                        sync_count
+                    FROM terminal_status
+                    ORDER BY terminal_id
+                ''')
             
             terminals = []
             for row in self.cursor.fetchall():
